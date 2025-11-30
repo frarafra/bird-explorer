@@ -3,7 +3,6 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import Leaflet from 'leaflet';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import { BirdContext } from '../contexts/BirdContext';
 
 import { Result } from '../types';
 
@@ -53,9 +52,11 @@ const MapEventsHandler = ({ onMoveEnd }: { onMoveEnd: (newCenter: { lat: number,
     return null;
   };
   
+const initialZoom = process.env.NEXT_PUBLIC_MAP_ZOOM;
+
 const Map: React.FC<MapProps> = ({ lat, lng, results, hoveredResultId, onMoveEnd }) => {
   return (
-      <MapContainer center={[lat, lng]} zoom={9} style={{ height: "100%", width: "100%" }}>
+      <MapContainer center={[lat, lng]} zoom={Number(initialZoom)} style={{ height: "100%", width: "100%" }}>
           <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
