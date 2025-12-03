@@ -8,10 +8,13 @@ const EBIRD_OBS_API_URL = 'https://api.ebird.org/v2/data/obs/geo/recent';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { lat, lng } = req.query;
-  const cacheKey = `ebirdSpeciesSearch:${lat}:${lng}`;
+  const cacheKey = `ebirdSpeciesSearch:${process.env.NEXT_PUBLIC_LAT}:${process.env.NEXT_PUBLIC_LNG}`;
+  let cachedData;
 
   try {
-    let cachedData = await redis.get(cacheKey);
+    if (Number(lat) === Number(process.env.NEXT_PUBLIC_LAT) && Number(lng) === Number(process.env.NEXT_PUBLIC_LNG)) {
+        cachedData = await redis.get(cacheKey);
+    }
 
     if (cachedData) {
       return res.status(200).json(JSON.parse(cachedData));
@@ -29,7 +32,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const data = await response.json();
 
-    await redis.set(cacheKey, JSON.stringify(data), 'EX', 24 * 60 * 60);
+    if (Number(lat) === Number(process.env.NEXT_PUBLIC_LAT) && Number(lng) === Number(process.env.NEXT_PUBLIC_LNG)) {
+      await redis.set(cacheKey, JSON.stringify(data), 'EX', 24 * 60 * 60);
+    }
 
     res.status(200).json(data);
   } catch (error) {

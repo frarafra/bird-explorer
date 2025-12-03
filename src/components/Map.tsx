@@ -30,33 +30,31 @@ const highlightedMapIcon = new Leaflet.Icon({
 });
 
 const MapEventsHandler = ({ onMoveEnd }: { onMoveEnd: (newCenter: { lat: number, lng: number }) => void }) => {
-    const map = useMap();
-  
-    useEffect(() => {
-      const handleMoveEnd = () => {
-        const center = map.getCenter();
-        onMoveEnd({ lat: center.lat, lng: center.lng });
-      };
-  
-      if (map) {
-        map.on('moveend', handleMoveEnd);
-      }
-  
-      return () => {
-        if (map) {
-          map.off('moveend', handleMoveEnd);
-        }
-      };
-    }, [map, onMoveEnd]);
-  
-    return null;
-  };
-  
-const initialZoom = process.env.NEXT_PUBLIC_MAP_ZOOM;
+  const map = useMap();
 
+  useEffect(() => {
+    const handleMoveEnd = () => {
+      const center = map.getCenter();
+      onMoveEnd({ lat: center.lat, lng: center.lng });
+    };
+
+    if (map) {
+      map.on('moveend', handleMoveEnd);
+    }
+
+    return () => {
+      if (map) {
+        map.off('moveend', handleMoveEnd);
+      }
+    };
+  }, [map, onMoveEnd]);
+
+  return null;
+};
+  
 const Map: React.FC<MapProps> = ({ lat, lng, results, hoveredResultId, onMoveEnd }) => {
   return (
-      <MapContainer center={[lat, lng]} zoom={Number(initialZoom)} style={{ height: "100%", width: "100%" }}>
+      <MapContainer center={[lat, lng]} zoom={10} style={{ height: "100%", width: "100%" }}>
           <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
