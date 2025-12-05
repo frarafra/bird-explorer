@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 
@@ -20,6 +20,7 @@ const HomePage = () => {
     const { birds, setBirds, mapCenter, setMapCenter, setTaxonomies } = useContext(BirdContext);
     const [observations, setObservations] = useState([]);
     const [hoveredResultId, setHoveredResultId] = useState<number | null>(null);
+    const isInitialMount = useRef(true);
 
     const { lat, lng } = mapCenter;
     
@@ -92,6 +93,10 @@ const HomePage = () => {
     }, [lat, lng]);
 
     useEffect(() => {
+        if (isInitialMount.current) { 
+            isInitialMount.current = false; 
+            return; 
+        }
         const speciesCodes = Object.values(birds);
         if (speciesCodes.length > 0) {
             fetchTaxonomies(speciesCodes);

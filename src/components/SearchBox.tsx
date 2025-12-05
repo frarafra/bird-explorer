@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 
 import { BirdContext } from '../contexts/BirdContext';
 
@@ -10,8 +10,14 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
     const [bird, setBird] = useState('');
     const { birds, taxonomies } = useContext(BirdContext);
     const [suggestions, setSuggestions] = useState<string[]>([]);
+    const isInitialMount = useRef(true);
     
     useEffect(() => {
+        if (isInitialMount.current) { 
+            isInitialMount.current = false; 
+            return; 
+        }
+ 
         if (bird.length > 0) {
             const filteredSuggestions = Object.keys(birds).filter(suggestion =>
                 suggestion.toLowerCase().includes(bird.toLowerCase())
