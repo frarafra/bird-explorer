@@ -1,18 +1,13 @@
 import { createContext, FC, ReactNode, useEffect, useState } from 'react';
+import { MapCenter } from '../types';
 
 interface BirdContextType {
     birds: Record<string, string>;
     setBirds: React.Dispatch<React.SetStateAction<Record<string, string>>>;
     birdImages: Record<string, string>;
     setBirdImages: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-    mapCenter: {
-        lat: number;
-        lng: number;
-    };
-    setMapCenter: React.Dispatch<React.SetStateAction<{
-        lat: number;
-        lng: number;
-    }>>;
+    mapCenter: MapCenter;
+    setMapCenter: React.Dispatch<React.SetStateAction<MapCenter>>;
     taxonomies: Record<string, string>;
     setTaxonomies: React.Dispatch<React.SetStateAction<Record<string, string>>>;
     page: number;

@@ -3,15 +3,32 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
+import CopyToClipboard from 'react-copy-to-clipboard';
 
 import { BirdContext } from '../contexts/BirdContext';
 import SearchBox from '../components/SearchBox';
 import SearchResults from '../components/SearchResults';
-import { Result } from '../types';
+import { MapCenter, Result } from '../types';
+import MainLayout from '../layouts/MainLayout';
 
 const Map = dynamic(() => import('../components/Map'), {
     ssr: false,
 });
+
+const ShareButton = ({ mapCenter, species }: { mapCenter: MapCenter; species?: string }) => {
+    const getShareableLink = () => {
+        if (typeof window !== 'undefined') {
+            return `${window.location.origin}?lat=${mapCenter.lat}&lng=${mapCenter.lng}${species ? `&species=${species}` : ''}`;
+        }
+        return '';
+    };
+
+    return (
+        <CopyToClipboard text={getShareableLink()} onCopy={() => alert('Link copied to clipboard!')}>
+            <button>Share link</button>
+        </CopyToClipboard>
+    );
+};
 
 const HomePage = () => {
     const router = useRouter();
@@ -106,24 +123,26 @@ const HomePage = () => {
     useEffect(() => {
         getBirdObservations(species as string);
     }, [species]);
-    
+
     return (
-        <div style={{ display: 'flex', height: '100vh' }}>
-            <div style={{ flex: 2, paddingRight: '20px' }}>
-                <SearchBox onSearch={handleSearch} />
-                <SearchResults results={observations.slice(0, 10).sort((a: Result, b: Result) => {
-                    const aObsDt = Date.parse(a.obsDt);
-                    const bObsDt = Date.parse(b.obsDt);
-                    if (bObsDt !== aObsDt) {
-                        return bObsDt - aObsDt;
-                    }
-                    return b.howMany - a.howMany;
-                })} setHoveredResultId={setHoveredResultId} />
+        <MainLayout shareButton={<ShareButton mapCenter={mapCenter} species={species as string}/>}>
+            <div style={{ display: 'flex', height: '100vh' }}>
+                <div style={{ flex: 2, paddingRight: '20px' }}>
+                    <SearchBox onSearch={handleSearch} />
+                    <SearchResults results={observations.slice(0, 10).sort((a: Result, b: Result) => {
+                        const aObsDt = Date.parse(a.obsDt);
+                        const bObsDt = Date.parse(b.obsDt);
+                        if (bObsDt !== aObsDt) {
+                            return bObsDt - aObsDt;
+                        }
+                        return b.howMany - a.howMany;
+                    })} setHoveredResultId={setHoveredResultId} />
+                </div>
+                <div style={{ flex: 3, position: 'relative', height: '100vh' }}>
+                    <Map lat={mapCenter.lat} lng={mapCenter.lng} results={observations} hoveredResultId={hoveredResultId} onMoveEnd={setMapCenter} />
+                </div>
             </div>
-            <div style={{ flex: 3, position: 'relative', height: '100vh' }}>
-                <Map lat={mapCenter.lat} lng={mapCenter.lng} results={observations} hoveredResultId={hoveredResultId} onMoveEnd={setMapCenter} />
-            </div>
-        </div>
+        </MainLayout>
     );
 };
 

@@ -9,3 +9,8 @@ export interface Result {
   speciesCode: string;
   subId: number;
 }
+
+export interface MapCenter {
+  lat: number;
+  lng: number;
+}

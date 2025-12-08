@@ -2,6 +2,7 @@ import React, { FC, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
 import { BirdContext } from '../contexts/BirdContext';
+import MainLayout from '../layouts/MainLayout';
 
 interface BirdData {
     name: string;
@@ -137,53 +138,55 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     };
 
     return (
-        <div>
-            <ul style={{ listStyleType: 'none', paddingLeft: 0 }}>
-                {Object.entries(birdImages).map(([name, birdImageUrl]) => {
-                    const speciesCode = birds[name];
+        <MainLayout>
+            <div>
+                <ul style={{ listStyleType: 'none', paddingLeft: 0 }}>
+                    {Object.entries(birdImages).map(([name, birdImageUrl]) => {
+                        const speciesCode = birds[name];
 
-                    const handleClick = () => router.push(`/?species=${speciesCode}`);
+                        const handleClick = () => router.push(`/?species=${speciesCode}`);
 
-                    return (
-                        <li key={name} style={{
-                            cursor: 'default',
-                            padding: '4px 8px',
-                            backgroundColor: '#f5f5f5',
-                            marginTop: '2px',
-                            display: 'flex',
-                            alignItems: 'center'
-                        }}>
-                            {birdImageUrl && (
-                                <img 
-                                    src={birdImageUrl} 
-                                    alt={`${name}`}
-                                    style={{
-                                        width: '40px',
-                                        height: 'auto',
-                                        marginRight: '8px',
-                                        transition: 'transform 0.3s ease-in-out',
-                                        cursor: 'pointer'
-                                    }}
-                                    onMouseOver={(e) => {
-                                        (e.target as HTMLElement).style.transform = 'scale(2)';
-                                    }}
-                                    onMouseOut={(e) => {
-                                        (e.target as HTMLElement).style.transform = 'scale(1)';
-                                    }}
-                                />
-                            )}
-                            <span onClick={handleClick} style={{ cursor: 'pointer' }}>
-                                {name}
-                            </span>
-                        </li>
-                    );
-                })}
-            </ul>
-            {isLoading && <p>Loading...</p>}
-            <button onClick={loadMore} disabled={isLoading || page >= Math.ceil(Object.keys(birds).length / batchSize)}>
-                Load More
-            </button>
-        </div>
+                        return (
+                            <li key={name} style={{
+                                cursor: 'default',
+                                padding: '4px 8px',
+                                backgroundColor: '#f5f5f5',
+                                marginTop: '2px',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}>
+                                {birdImageUrl && (
+                                    <img 
+                                        src={birdImageUrl} 
+                                        alt={`${name}`}
+                                        style={{
+                                            width: '40px',
+                                            height: 'auto',
+                                            marginRight: '8px',
+                                            transition: 'transform 0.3s ease-in-out',
+                                            cursor: 'pointer'
+                                        }}
+                                        onMouseOver={(e) => {
+                                            (e.target as HTMLElement).style.transform = 'scale(2)';
+                                        }}
+                                        onMouseOut={(e) => {
+                                            (e.target as HTMLElement).style.transform = 'scale(1)';
+                                        }}
+                                    />
+                                )}
+                                <span onClick={handleClick} style={{ cursor: 'pointer' }}>
+                                    {name}
+                                </span>
+                            </li>
+                        );
+                    })}
+                </ul>
+                {isLoading && <p>Loading...</p>}
+                <button onClick={loadMore} disabled={isLoading || page >= Math.ceil(Object.keys(birds).length / batchSize)}>
+                    Load More
+                </button>
+            </div>
+        </MainLayout>
     );
 };
 

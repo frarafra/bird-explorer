@@ -6,9 +6,7 @@ import { BirdProvider } from '../contexts/BirdContext';
 function MyApp({ Component, pageProps }: AppProps) {
     return (
         <BirdProvider>
-            <MainLayout>
-                <Component {...pageProps} />
-            </MainLayout>
+            <Component {...pageProps} />
         </BirdProvider>
     );
 }

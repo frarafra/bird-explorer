@@ -17,6 +17,7 @@
     "next": "latest",
     "papaparse": "5.5.3",
     "react": "latest",
+    "react-copy-to-clipboard": "5.1.0",
     "react-dom": "latest",
     "react-leaflet": "5.0.0",
     "tough-cookie": "6.0.0"
@@ -26,6 +27,7 @@
     "@types/node": "latest",
     "@types/papaparse": "5.3.16",
     "@types/react": "latest",
+    "@types/react-copy-to-clipboard": "^5.0.7",
     "css-loader": "7.1.2",
     "style-loader": "4.0.0",
     "typescript": "latest"
