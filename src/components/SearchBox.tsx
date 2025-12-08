@@ -1,6 +1,7 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
 
 import { BirdContext } from '../contexts/BirdContext';
+import { useRouter } from 'next/router';
 
 interface SearchBoxProps {
     onSearch: (bird: string) => void;
@@ -11,6 +12,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
     const { birds, taxonomies } = useContext(BirdContext);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const isInitialMount = useRef(true);
+    const router = useRouter();
     
     useEffect(() => {
         if (isInitialMount.current) { 
@@ -38,10 +40,12 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
     }, [bird]);
 
     const handleSubmit = (event: React.FormEvent) => {
+        const speciesCode = birds[bird];
         event.preventDefault();
-        onSearch(birds[bird]);
+        onSearch(speciesCode);
         setBird('');
         setSuggestions([]);
+        router.push(`/?species=${speciesCode}`);
     };
 
     return (

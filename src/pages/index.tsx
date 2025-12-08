@@ -16,6 +16,15 @@ const Map = dynamic(() => import('../components/Map'), {
 });
 
 const ShareButton = ({ mapCenter, species }: { mapCenter: MapCenter; species?: string }) => {
+    const isInitialMount = useRef(true);
+
+    useEffect(() => {
+            if (isInitialMount.current) { 
+                isInitialMount.current = false; 
+                return; 
+            }
+    }, []);
+
     const getShareableLink = () => {
         if (typeof window !== 'undefined') {
             return `${window.location.origin}?lat=${mapCenter.lat}&lng=${mapCenter.lng}${species ? `&species=${species}` : ''}`;
