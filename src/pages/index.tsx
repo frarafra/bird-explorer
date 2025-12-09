@@ -87,9 +87,11 @@ const HomePage = () => {
     const getBirdObservations = async (bird: string) => {
         if (!bird ||!mapCenter.lat || !mapCenter.lng) return;
 
+        const lat = latParam as string || mapCenter.lat.toString();
+        const lng = lngParam as string || mapCenter.lng.toString();
         let observations = [];
         try {
-            const response = await fetch(`/api/ebirdObservations?bird=${bird}&lat=${mapCenter.lat}&lng=${mapCenter.lng}`);
+            const response = await fetch(`/api/ebirdObservations?bird=${bird}&lat=${lat}&lng=${lng}`);
             observations = await response.json();
         } catch (error) {
             console.error(error);
