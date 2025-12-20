@@ -1,4 +1,6 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 
 interface BirdsLocationProps {
     lat: number;
@@ -12,8 +14,41 @@ interface ComparisonResultsProps {
     onClose: () => void;
 }
 
+const getLocationName = async (lat: number, lng: number): Promise<string> => {
+    const response = await fetch(`/api/osmReverseGeocode?lat=${lat}&lng=${lng}`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch location name: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.locationName || `${lat}, ${lng}`;
+};
+
 const ComparisonResults: React.FC<ComparisonResultsProps> = ({ point1, point2, onClose }) => {
+    const [locationName1, setLocationName1] = useState<string>('');
+    const [locationName2, setLocationName2] = useState<string>('');
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+
+    useEffect(() => {
+        const fetchLocationNames = async () => {
+            try {
+                const name1 = await getLocationName(point1.lat, point1.lng);
+                const name2 = await getLocationName(point2.lat, point2.lng);
+                setLocationName1(name1);
+                setLocationName2(name2);
+            } catch (error) {
+                console.error('Error fetching location names:', error);
+                setLocationName1(`${point1.lat}, ${point1.lng}`);
+                setLocationName2(`${point2.lat}, ${point2.lng}`);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchLocationNames();
+    }, [point1, point2]);
+
     if (!point1 || !point2) return null;
+    if (isLoading) return null;
 
     const birds1 = [...new Set(point1.species)];
     const birds2 = [...new Set(point2.species)];
@@ -42,7 +77,7 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ point1, point2, o
             <button onClick={onClose} style={{ float: 'right' }}>Close</button>
 
             <div style={{ marginTop: '20px' }}>
-                <h4>Unique to Point 1 ({point1.lat}, {point1.lng}): ({uniqueToPoint1.length})</h4>
+                <h4>Unique to {locationName1} ({uniqueToPoint1.length})</h4>
                 <ul>
                     {uniqueToPoint1.map(specie => (
                         <li key={specie}>{specie}</li>
@@ -51,7 +86,7 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ point1, point2, o
             </div>
 
             <div style={{ marginTop: '20px' }}>
-                <h4>Unique to Point 2 ({point2.lat}, {point2.lng}): ({uniqueToPoint2.length})</h4>
+                <h4>Unique to {locationName2} ({uniqueToPoint2.length})</h4>
                 <ul>
                     {uniqueToPoint2.map(specie => (
                         <li key={specie}>{specie}</li>
