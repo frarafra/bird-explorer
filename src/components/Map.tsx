@@ -76,6 +76,18 @@ const Map: React.FC<MapProps> = ({ lat, lng, results, hoveredResultId, onMoveEnd
   const [point2, setPoint2] = useState<{lat: number, lng: number, species: string[]} | null>(null);
   const [showComparison, setShowComparison] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkIfMobile();
+    window.addEventListener('resize', checkIfMobile);
+
+    return () => window.removeEventListener('resize', checkIfMobile);
+  }, []);
 
   const handleLocationSelected = async (lat: number, lng: number) => {
     if (!compareMode) return;
@@ -166,16 +178,20 @@ const Map: React.FC<MapProps> = ({ lat, lng, results, hoveredResultId, onMoveEnd
               }}
               style={{
                   position: 'absolute',
-                  top: '10px',
-                  right: '10px',
+                  top: isMobile ? 'auto' : '10px',
+                  right: isMobile ? 'auto' : '10px',
+                  bottom: isMobile ? '40px' : 'auto',
+                  left: isMobile ? '50%' : 'auto',
+                  transform: isMobile ? 'translateX(-50%)' : 'none',
                   zIndex: 1000,
                   padding: '8px 12px',
                   background: compareMode ? '#ff6b6b' : '#4ecdc4',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: 'pointer'
-              }}
+                  cursor: 'pointer',
+                  width: isMobile ? '90%' : 'auto'
+                }}
           >
               {compareMode ? 'Cancel Compare' : 'Compare Locations'}
           </button>
