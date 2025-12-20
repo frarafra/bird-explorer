@@ -185,6 +185,7 @@ const Map: React.FC<MapProps> = ({ lat, lng, results, hoveredResultId, onMoveEnd
                   transform: isMobile ? 'translateX(-50%)' : 'none',
                   zIndex: 1000,
                   padding: '8px 12px',
+                  marginBottom: '10px',
                   background: compareMode ? '#ff6b6b' : '#4ecdc4',
                   color: 'white',
                   border: 'none',

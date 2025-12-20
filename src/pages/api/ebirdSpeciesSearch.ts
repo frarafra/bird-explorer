@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const data = await response.json();
-    console.log('🚀', lat, lng, JSON.stringify(data));
+
     if (Number(lat) === Number(process.env.NEXT_PUBLIC_LAT) && Number(lng) === Number(process.env.NEXT_PUBLIC_LNG)) {
       await redis.set(cacheKey, JSON.stringify(data), 'EX', 24 * 60 * 60);
     }
