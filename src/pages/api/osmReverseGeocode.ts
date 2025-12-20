@@ -3,7 +3,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 const OPENSTREETMAP_REVERSE_GEOCODE_URL = 'https://nominatim.openstreetmap.org/reverse';
 
 const getLocationName = async (lat: number, lng: number): Promise<string> => {
-    const response = await fetch(`${OPENSTREETMAP_REVERSE_GEOCODE_URL}?format=json&lat=${lat}&lon=${lng}`);
+    const response = await fetch(`${OPENSTREETMAP_REVERSE_GEOCODE_URL}?format=json&lat=${lat}&lon=${lng}`, {
+        headers: {
+            'User-Agent': 'bird-search-app/1.0 (https://github.com/frarafra/bird-explorer)'
+        }
+    });
     if (!response.ok) {
         throw new Error(`Failed to fetch location name: ${response.statusText}`);
     }
