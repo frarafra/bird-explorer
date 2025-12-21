@@ -121,13 +121,8 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ point1, point2, o
                 <button
                     onClick={scrollToTop}
                     style={{
-                        backgroundColor: '#4ecdc4',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
                         padding: '8px 16px',
                         cursor: 'pointer',
-                        fontWeight: 'bold'
                     }}
                 >
                     Scroll to Top
