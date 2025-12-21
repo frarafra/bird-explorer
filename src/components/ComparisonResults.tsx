@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface BirdsLocationProps {
     lat: number;
@@ -27,6 +27,7 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ point1, point2, o
     const [locationName1, setLocationName1] = useState<string>('');
     const [locationName2, setLocationName2] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const fetchLocationNames = async () => {
@@ -47,6 +48,12 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ point1, point2, o
         fetchLocationNames();
     }, [point1, point2]);
 
+    const scrollToTop = () => {
+        if (containerRef.current) {
+            containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
     if (!point1 || !point2) return null;
     if (isLoading) return null;
 
@@ -59,20 +66,23 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ point1, point2, o
     const uniqueToPoint2 = birds2.filter(bird => !birds1.includes(bird));
 
     return (
-        <div style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 0 10px rgba(0,0,0,0.3)',
-            zIndex: 1000,
-            maxWidth: '80%',
-            maxHeight: '80%',
-            overflow: 'auto'
-        }}>
+        <div
+            ref={containerRef}
+            style={{
+                position: 'fixed',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                background: 'white',
+                padding: '20px',
+                borderRadius: '8px',
+                boxShadow: '0 0 10px rgba(0,0,0,0.3)',
+                zIndex: 1000,
+                maxWidth: '80%',
+                maxHeight: '80%',
+                overflow: 'auto'
+            }}
+        >
             <h3>Comparison Results</h3>
             <button onClick={onClose} style={{ float: 'right' }}>Close</button>
 
@@ -101,6 +111,27 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ point1, point2, o
                         <li key={specie}>{specie}</li>
                     ))}
                 </ul>
+            </div>
+
+            <div style={{
+                textAlign: 'center',
+                marginTop: '20px',
+                paddingBottom: '10px'
+            }}>
+                <button
+                    onClick={scrollToTop}
+                    style={{
+                        backgroundColor: '#4ecdc4',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                    }}
+                >
+                    Scroll to Top
+                </button>
             </div>
         </div>
     );
