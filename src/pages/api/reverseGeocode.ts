@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-const OPENSTREETMAP_REVERSE_GEOCODE_URL = 'https://nominatim.openstreetmap.org/reverse';
+const MAPBOX_REVERSE_GEOCODE_URL = 'https://api.mapbox.com/search/geocode/v6/reverse';
 
 const getLocationName = async (lat: number, lng: number): Promise<string> => {
-    const response = await fetch(`${OPENSTREETMAP_REVERSE_GEOCODE_URL}?format=json&lat=${lat}&lon=${lng}`, {
+    const response = await fetch(`${MAPBOX_REVERSE_GEOCODE_URL}?types=place&access_token=${process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}&longitude=${lng}&latitude=${lat}`, {
         headers: {
             'User-Agent': 'bird-search-app/1.0 (https://github.com/frarafra/bird-explorer)'
         }
@@ -12,7 +12,8 @@ const getLocationName = async (lat: number, lng: number): Promise<string> => {
         throw new Error(`Failed to fetch location name: ${response.statusText}`);
     }
     const data = await response.json();
-    return data.display_name || `${lat}, ${lng}`;
+    console.log('🚀', JSON.stringify(data, null, 2));
+    return data.features[0]?.properties?.full_address || `${lat}, ${lng}`;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

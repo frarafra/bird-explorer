@@ -15,7 +15,7 @@ interface ComparisonResultsProps {
 }
 
 const getLocationName = async (lat: number, lng: number): Promise<string> => {
-    const response = await fetch(`/api/osmReverseGeocode?lat=${lat}&lng=${lng}`);
+    const response = await fetch(`/api/reverseGeocode?lat=${lat}&lng=${lng}`);
     if (!response.ok) {
         throw new Error(`Failed to fetch location name: ${response.statusText}`);
     }
