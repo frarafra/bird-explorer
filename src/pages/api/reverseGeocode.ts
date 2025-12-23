@@ -12,7 +12,7 @@ const getLocationName = async (lat: number, lng: number): Promise<string> => {
         throw new Error(`Failed to fetch location name: ${response.statusText}`);
     }
     const data = await response.json();
-    console.log('🚀', JSON.stringify(data, null, 2));
+
     return data.features[0]?.properties?.full_address || `${lat}, ${lng}`;
 }
 
