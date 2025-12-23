@@ -118,7 +118,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     }, [birds, taxonomies]);
 
     useEffect(() => {
-        if (orderedBirds.length > 0 && page < Math.ceil(orderedBirds.length / batchSize)) {
+        if (orderedBirds?.length > 0 && page < Math.ceil(orderedBirds.length / batchSize)) {
             const currentBatch = orderedBirds
                 .slice(page * batchSize, (page + 1) * batchSize)
                 .reduce((acc: Record<string, string>, [name, code]) => {
