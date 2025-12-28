@@ -15,7 +15,6 @@
     "ioredis": "5.8.2",
     "leaflet": "1.9.4",
     "next": "latest",
-    "papaparse": "5.5.3",
     "react": "latest",
     "react-copy-to-clipboard": "5.1.0",
     "react-dom": "latest",

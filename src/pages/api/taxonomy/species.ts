@@ -1,22 +1,10 @@
-import { parse } from 'papaparse';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { getRedisClient } from '../../../client/redis';
 
 const redis = getRedisClient();
 
-const EBIRD_TAXONOMY_API_URL = 'https://api.ebird.org/v2/ref/taxonomy/ebird?version=2019&species=';
-
-interface TaxonomyResponse {
-    data: string[][];
-}
-
-async function parseCSVAsync(url: string): Promise<TaxonomyResponse> {
-    const response = await fetch(url); 
-    const csvString = await response.text();
-
-    return parse(csvString);
-}
+const EBIRD_TAXONOMY_API_URL = 'https://api.ebird.org/v2/ref/taxonomy/ebird?fmt=json&version=2019&species=';
 
 async function ebirdTaxonomySearch(speciesCodes: string[]) {
     const parsePromises = speciesCodes.map(async(speciesCode) => {
@@ -26,9 +14,11 @@ async function ebirdTaxonomySearch(speciesCodes: string[]) {
             return JSON.parse(cachedBirdFamily); 
         }
 
-        const parsedData: TaxonomyResponse = await parseCSVAsync(`${EBIRD_TAXONOMY_API_URL}${speciesCode}`);
-    
-        return parsedData?.data?.[1]?.[parsedData?.data?.[0]?.indexOf('FAMILY_COM_NAME')];
+        const response = await fetch(`${EBIRD_TAXONOMY_API_URL}${speciesCode}`);
+
+        const birdTaxon = await response.json();
+
+        return birdTaxon?.[0]?.familyComName;
     });
 
     const results = await Promise.allSettled(parsePromises);
