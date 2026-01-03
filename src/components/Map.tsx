@@ -69,6 +69,14 @@ const MapEventsHandler = ({ onMoveEnd }: { onMoveEnd: (newCenter: { lat: number,
 
   return null;
 };
+
+const UpdateMapView = ({ lat, lng }: { lat: number; lng: number }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([lat, lng], map.getZoom());
+  }, [lat, lng, map]);
+  return null;
+};
   
 const Map: React.FC<MapProps> = ({ lat, lng, results, hoveredResultId, onMoveEnd }) => {
   const [compareMode, setCompareMode] = useState(false);
@@ -125,13 +133,14 @@ const Map: React.FC<MapProps> = ({ lat, lng, results, hoveredResultId, onMoveEnd
       <div style={{ position: 'relative', height: '100vh', width: '100%' }}>
           <MapContainer
               center={[lat, lng]}
-              zoom={10}
+              zoom={9}
               style={{ height: "100%", width: "100%" }}
           >
               <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               />
+              <UpdateMapView lat={lat} lng={lng} />
 
               {results.map((result: Result) => (
                   <Marker

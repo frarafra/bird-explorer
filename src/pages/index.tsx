@@ -43,8 +43,7 @@ const HomePage = () => {
     const router = useRouter();
     const { lat: latParam, lng: lngParam, species } = router.query;
 
-    const { birds, setBirds, mapCenter, setMapCenter, setTaxonomies } = useContext(BirdContext);
-    const [observations, setObservations] = useState([]);
+    const { birds, setBirds, observations, setObservations, mapCenter, setMapCenter, setTaxonomies } = useContext(BirdContext);
     const [hoveredResultId, setHoveredResultId] = useState<number | null>(null);
     const isInitialMount = useRef(true);
 
@@ -85,19 +84,21 @@ const HomePage = () => {
     };
     
     const getBirdObservations = async (bird: string) => {
+        if (observations.length > 0) {
+            return;
+        }
         if (!bird ||!mapCenter.lat || !mapCenter.lng) return;
 
         const lat = latParam as string || mapCenter.lat.toString();
         const lng = lngParam as string || mapCenter.lng.toString();
-        let observations = [];
+        let nearObservations = [];
         try {
             const response = await fetch(`/api/ebirdObservations?bird=${bird}&lat=${lat}&lng=${lng}`);
-            observations = await response.json();
+            nearObservations = await response.json();
         } catch (error) {
             console.error(error);
-            return {};
         }
-        setObservations(observations);
+        setObservations(nearObservations);
     };
     
     const handleSearch = async (bird: string) => {
