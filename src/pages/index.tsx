@@ -84,9 +84,6 @@ const HomePage = () => {
     };
     
     const getBirdObservations = async (bird: string) => {
-        if (observations.length > 0) {
-            return;
-        }
         if (!bird ||!mapCenter.lat || !mapCenter.lng) return;
 
         const lat = latParam as string || mapCenter.lat.toString();
