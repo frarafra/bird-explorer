@@ -60,10 +60,11 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
         try {
             const response = await fetch(`/api/ebirdObservations?bird=${bird}&lat=${lat}&lng=${lng}`);
             observations = await response.json();
+            setObservations(observations);
         } catch (error) {
             console.error(error);
         }
-        setObservations(observations);
+
         return observations;
     };
 
@@ -131,6 +132,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        setObservations([]);
         const speciesCode = birds[bird];
         const extendedSpeciesCode = extendedBird.code;
         let centerCoordinates: {centerLat: string, centerLng: string} | null = null;
