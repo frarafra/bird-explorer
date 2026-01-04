@@ -132,6 +132,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (!bird) return;
         setObservations([]);
         const speciesCode = birds[bird];
         const extendedSpeciesCode = extendedBird.code;
