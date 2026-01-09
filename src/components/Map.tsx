@@ -19,23 +19,19 @@ const mapIcon = new Leaflet.Icon({
   iconUrl: markerIcon.src ?? '/markers/marker-icon.png',
   iconSize: [12, 20],
   iconAnchor: [7, 7],
-  popupAnchor: [1, -34],
+  popupAnchor: [0, -7],
   tooltipAnchor: [16, -28]
 });
 
 const highlightedMapIcon = new Leaflet.Icon({
   iconUrl: markerIcon.src ?? '/markers/marker-icon.png',
   iconSize: [25, 41], // Bigger size
-  iconAnchor: [7, 7],
-  popupAnchor: [0, -40]
 });
 
 const compareIcon = new Leaflet.Icon({
   iconUrl: markerIcon.src ?? '/markers/comparer-icon.png',
   iconSize: [12, 20],
   iconAnchor: [7, 7],
-  popupAnchor: [1, -34],
-  tooltipAnchor: [16, -28]
 });
 
 const MapClickHandler = ({ onLocationSelected }: { onLocationSelected: (lat: number, lng: number) => void }) => {
