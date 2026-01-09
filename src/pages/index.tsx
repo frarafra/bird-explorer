@@ -41,7 +41,7 @@ const ShareButton = ({ mapCenter, species }: { mapCenter: MapCenter; species?: s
 
 const HomePage = () => {
     const router = useRouter();
-    const { lat: latParam, lng: lngParam, species } = router.query;
+    const { lat: latParam, lng: lngParam, species, extended } = router.query;
 
     const { birds, setBirds, observations, setObservations, mapCenter, setMapCenter, setTaxonomies } = useContext(BirdContext);
     const [hoveredResultId, setHoveredResultId] = useState<number | null>(null);
@@ -148,7 +148,7 @@ const HomePage = () => {
                     })} setHoveredResultId={setHoveredResultId} />
                 </div>
                 <div style={{ flex: 3, position: 'relative', height: '100vh' }}>
-                    <Map lat={mapCenter.lat} lng={mapCenter.lng} results={observations} hoveredResultId={hoveredResultId} onMoveEnd={setMapCenter} />
+                    <Map extended={extended === 'true'} lat={mapCenter.lat} lng={mapCenter.lng} results={observations} hoveredResultId={hoveredResultId} onMoveEnd={setMapCenter} />
                 </div>
             </div>
         </MainLayout>

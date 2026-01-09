@@ -2,7 +2,6 @@ import React, { useContext, useState, useEffect, useRef } from 'react';
 
 import { BirdContext } from '../contexts/BirdContext';
 import { useRouter } from 'next/router';
-import { calculateObservationsBoundariesCenter, findClosestResult } from '../utils/mapUtils';
 
 interface SearchBoxProps {
     onSearch: (bird: string) => void;
@@ -37,58 +36,6 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
         }
     };
 
-    const getExtendedBirdExtension = async (speciesCode: string) => {
-        try {
-            const boundsResponse = await fetch(`/api/ebirdSpeciesExtension?bird=${speciesCode}`);
-            if (!boundsResponse.ok) throw new Error('Failed to fetch species bounds');
-
-            const boundsData = await boundsResponse.json();
-
-            const centerLat = (boundsData.minY + boundsData.maxY) / 2;
-            const centerLng = (boundsData.minX + boundsData.maxX) / 2;
-
-            return { centerLat, centerLng };
-        } catch (error) {
-            console.error('Error fetching species bounds:', error);
-        }
-    }
-
-    const getBirdObservations = async (bird: string, lat: number, lng: number) => {
-        if (!bird ||!lat || !lng) return;
-
-        let observations = [];
-        try {
-            const response = await fetch(`/api/ebirdObservations?bird=${bird}&lat=${lat}&lng=${lng}`);
-            observations = await response.json();
-            setObservations(observations);
-        } catch (error) {
-            console.error(error);
-        }
-
-        return observations;
-    };
-
-    const getExtendedBirdMapCenter = async (speciesCode: string) => {
-        const defaultExtension = {
-            centerLat: '0',
-            centerLng: '0'
-        };
-        const birdExtension = await getExtendedBirdExtension(speciesCode);
-        if (!birdExtension) return defaultExtension;
-
-        const birdObservations = await getBirdObservations(speciesCode, birdExtension.centerLat, birdExtension.centerLng);
-
-        if (birdObservations.length === 0) return defaultExtension;
-        const birdObservationsCenter = calculateObservationsBoundariesCenter(birdObservations);
-
-        const closestResult = findClosestResult(birdObservations, birdObservationsCenter.lat, birdObservationsCenter.lng);
-
-        return { 
-            centerLat: (closestResult?.lat || birdExtension.centerLat).toString(), 
-            centerLng: (closestResult?.lng || birdExtension.centerLng).toString()
-        };
-    }
-  
     useEffect(() => {
         if (isInitialMount.current) { 
             isInitialMount.current = false; 
@@ -136,10 +83,6 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
         setObservations([]);
         const speciesCode = birds[bird];
         const extendedSpeciesCode = extendedBird.code;
-        let centerCoordinates: {centerLat: string, centerLng: string} | null = null;
-        if (extendedSpeciesCode) {
-            centerCoordinates = await getExtendedBirdMapCenter(extendedSpeciesCode);
-        }
         const birdCode = speciesCode || extendedSpeciesCode;
         onSearch(birdCode);
         setBird('');
@@ -149,9 +92,8 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
 
         const queryParams = new URLSearchParams();
         queryParams.set('species', birdCode);
-        if (centerCoordinates) {
-            queryParams.set('lat', centerCoordinates.centerLat);
-            queryParams.set('lng', centerCoordinates.centerLng);
+        if (extendedSpeciesCode) {
+            queryParams.set('extended', 'true');
         }
 
         router.push(`/?${queryParams.toString()}`);    

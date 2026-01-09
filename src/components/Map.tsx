@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import Leaflet from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -6,8 +6,10 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 
 import ComparisonResults from './ComparisonResults';
 import { Result } from '../types';
+import { calculateBounds } from '../utils/mapUtils';
 
 interface MapProps {
+    extended: boolean;
     lat: number;
     lng: number;
     results: Result[];
@@ -66,15 +68,31 @@ const MapEventsHandler = ({ onMoveEnd }: { onMoveEnd: (newCenter: { lat: number,
   return null;
 };
 
-const UpdateMapView = ({ lat, lng }: { lat: number; lng: number }) => {
+const UpdateMapView = ({ lat, lng, extended }: { lat: number; lng: number; extended: boolean }) => {
   const map = useMap();
   useEffect(() => {
-    map.setView([lat, lng], map.getZoom());
-  }, [lat, lng, map]);
+    if (!extended) {
+      map.setView([lat, lng], map.getZoom());
+    }
+  }, [lat, lng, map, extended]);
+  return null;
+};
+
+const FitBounds = ({ bounds }: { bounds: [[number, number], [number, number]] | null }) => {
+  const map = useMap();
+  const hasBeenFitted = useRef(false);
+
+  useEffect(() => {
+    if (bounds && !hasBeenFitted.current) {
+      map.fitBounds(bounds, { padding: [50, 50] });
+      hasBeenFitted.current = true;
+    }
+  }, [bounds, map]);
+
   return null;
 };
   
-const Map: React.FC<MapProps> = ({ lat, lng, results, hoveredResultId, onMoveEnd }) => {
+const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId, onMoveEnd }) => {
   const [compareMode, setCompareMode] = useState(false);
   const [point1, setPoint1] = useState<{lat: number, lng: number, species: string[]} | null>(null);
   const [point2, setPoint2] = useState<{lat: number, lng: number, species: string[]} | null>(null);
@@ -125,18 +143,20 @@ const Map: React.FC<MapProps> = ({ lat, lng, results, hoveredResultId, onMoveEnd
     setShowComparison(false);
   };
 
+  const bounds = calculateBounds(results);
+
   return (
       <div style={{ position: 'relative', height: '100vh', width: '100%' }}>
           <MapContainer
-              center={[lat, lng]}
-              zoom={9}
+              {...(!extended ? { center: [lat, lng], zoom: 10 } : {})}
               style={{ height: "100%", width: "100%" }}
           >
               <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               />
-              <UpdateMapView lat={lat} lng={lng} />
+              {extended && <FitBounds bounds={bounds} />}
+              <UpdateMapView lat={lat} lng={lng} extended={extended} />
 
               {results.map((result: Result) => (
                   <Marker
