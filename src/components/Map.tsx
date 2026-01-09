@@ -80,12 +80,10 @@ const UpdateMapView = ({ lat, lng, extended }: { lat: number; lng: number; exten
 
 const FitBounds = ({ bounds }: { bounds: [[number, number], [number, number]] | null }) => {
   const map = useMap();
-  const hasBeenFitted = useRef(false);
 
   useEffect(() => {
-    if (bounds && !hasBeenFitted.current) {
+    if (bounds) {
       map.fitBounds(bounds, { padding: [50, 50] });
-      hasBeenFitted.current = true;
     }
   }, [bounds, map]);
 
@@ -99,6 +97,7 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId,
   const [showComparison, setShowComparison] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [bounds, setBounds] = useState<[[number, number], [number, number]] | null>(null);
 
   useEffect(() => {
     const checkIfMobile = () => {
@@ -110,6 +109,10 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId,
 
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
+
+  useEffect(() => {
+    setBounds(calculateBounds(results));
+  }, [results]);
 
   const handleLocationSelected = async (lat: number, lng: number) => {
     if (!compareMode) return;
@@ -142,8 +145,6 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId,
     setPoint2(null);
     setShowComparison(false);
   };
-
-  const bounds = calculateBounds(results);
 
   return (
       <div style={{ position: 'relative', height: '100vh', width: '100%' }}>
