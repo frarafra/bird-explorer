@@ -1,4 +1,5 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
+import Fuse from 'fuse.js';
 
 import { BirdContext } from '../contexts/BirdContext';
 import { useRouter } from 'next/router';
@@ -11,6 +12,22 @@ interface ExtendedSuggestion {
     code: string;
 }
 
+const getExtendedSuggestions = async (bird: string) => {
+    try {
+        const response = await fetch(`/api/ebirdTaxonFind?bird=${bird}`);
+        if (!response.ok) throw new Error('Failed to fetch species');
+
+        const speciesData = await response.json();
+        if (speciesData.length === 0) {
+            return;
+        }
+
+        return speciesData;
+    } catch (error) {
+        console.error('Error fetching species data:', error);
+    }
+};
+
 const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
     const [bird, setBird] = useState('');
     const [extendedBird, setExtendedBird] = useState<Record<string, string>>({});
@@ -20,43 +37,33 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
     const isInitialMount = useRef(true);
     const router = useRouter();
 
-    const getExtendedSuggestions = async (bird: string) => {
-        try {
-            const response = await fetch(`/api/ebirdTaxonFind?bird=${bird}`);
-            if (!response.ok) throw new Error('Failed to fetch species');
-
-            const speciesData = await response.json();
-            if (speciesData.length === 0) {
-                return;
-            }
-
-            return speciesData;
-        } catch (error) {
-            console.error('Error fetching species data:', error);
-        }
-    };
-
     useEffect(() => {
         if (isInitialMount.current) { 
             isInitialMount.current = false; 
             return; 
         }
  
-        if (bird.length > 0) {
-            const filteredSuggestions = Object.keys(birds).filter(suggestion =>
-                suggestion.toLowerCase().includes(bird.toLowerCase())
-            ).sort();
+        if (bird.length > 1) {
+            const birdNames = Object.keys(birds);
+            const fuse = new Fuse(birdNames, {
+                distance: 150,
+                includeScore: true,
+                threshold: 0.4,
+            });
+            const fuzzyResults = fuse.search(bird)
+                .filter(result => result.score !== undefined && result.score < 0.4)
+                .map(result => result.item);
             
-            if (filteredSuggestions.length > 0) {
-                if (bird.length > 4 && taxonomies[birds[filteredSuggestions[0]]]) {
-                    const firstFamily = taxonomies[birds[filteredSuggestions[0]]];
-                    filteredSuggestions.push(...Object.keys(birds).filter(suggestion =>
-                        !filteredSuggestions.includes(suggestion)
+            if (fuzzyResults.length > 0) {
+                if (bird.length > 4 && taxonomies[birds[fuzzyResults[0]]]) {
+                    const firstFamily = taxonomies[birds[fuzzyResults[0]]];
+                    fuzzyResults.push(...birdNames.filter(suggestion =>
+                        !fuzzyResults.includes(suggestion)
                         && taxonomies[birds[suggestion]] === firstFamily
-                    ).slice(0, 4 - (filteredSuggestions.length > 1 ? 1 : 0)));
+                    ).slice(0, 4 - (fuzzyResults.length > 1 ? 1 : 0)));
                 }
 
-                setSuggestions(filteredSuggestions);
+                setSuggestions(fuzzyResults);
                 setExtendedSuggestions([]);
             } else {
                 if (bird.length > 2) {
