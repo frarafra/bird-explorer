@@ -20,7 +20,8 @@
     "react-copy-to-clipboard": "5.1.0",
     "react-dom": "latest",
     "react-leaflet": "5.0.0",
-    "tough-cookie": "6.0.0"
+    "tough-cookie": "6.0.0",
+    "typesense": "^2.1.0"
   },
   "devDependencies": {
     "@types/leaflet": "1.9.20",

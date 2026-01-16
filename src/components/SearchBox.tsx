@@ -46,9 +46,9 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
         if (bird.length > 1) {
             const birdNames = Object.keys(birds);
             const fuse = new Fuse(birdNames, {
-                distance: 150,
+                distance: process.env.NEXT_PUBLIC_FUSE_DISTANCE ? parseInt(process.env.NEXT_PUBLIC_FUSE_DISTANCE) : 100,
                 includeScore: true,
-                threshold: 0.4,
+                threshold: process.env.NEXT_PUBLIC_FUSE_THRESHOLD ? parseFloat(process.env.NEXT_PUBLIC_FUSE_THRESHOLD) : 0.4,
             });
             const fuzzyResults = fuse.search(bird)
                 .filter(result => result.score !== undefined && result.score < 0.4)
