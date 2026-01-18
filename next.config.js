@@ -1,6 +1,7 @@
 const path = require('path');
 
 module.exports = {
+  reactCompiler: true,
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.module.rules.push({
