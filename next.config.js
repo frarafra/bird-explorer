@@ -1,6 +1,9 @@
 const path = require('path');
 
 module.exports = {
+    images: {
+    domains: ['cdn.download.ams.birds.cornell.edu'],
+  },
   reactCompiler: true,
   webpack: (config, { isServer }) => {
     if (!isServer) {

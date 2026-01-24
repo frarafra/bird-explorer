@@ -31,6 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         query_by: 'primary_com_name',
         per_page: 150,
         facet_by: 'order,family',
+        filter_by: 'category:species'
       });
 
     taxons = results?.hits?.map(hit => ({ name: hit.document?.primary_com_name, code: hit.document?.species_code }));
