@@ -1,5 +1,4 @@
 import React, { FC, useContext, useState, useEffect } from 'react';
-import Image from 'next/image';
 import { useRouter } from 'next/router';
 
 import { BirdContext } from '../contexts/BirdContext';
@@ -155,23 +154,21 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                             alignItems: 'center'
                         }}>
                             {birdImageUrl && (
-                                <Image
-                                    src={birdImageUrl}
-                                    alt={name}
-                                    width={40}
-                                    height={40}
+                                <img 
+                                    src={birdImageUrl} 
+                                    alt={`${name}`}
                                     style={{
-                                        width: 'auto',
+                                        width: '40px',
                                         height: 'auto',
                                         marginRight: '8px',
                                         transition: 'transform 0.3s ease-in-out',
                                         cursor: 'pointer'
                                     }}
                                     onMouseOver={(e) => {
-                                        e.currentTarget.style.transform = 'scale(2)';
+                                        (e.target as HTMLElement).style.transform = 'scale(2)';
                                     }}
                                     onMouseOut={(e) => {
-                                        e.currentTarget.style.transform = 'scale(1)';
+                                        (e.target as HTMLElement).style.transform = 'scale(1)';
                                     }}
                                     loading="lazy"
                                 />
