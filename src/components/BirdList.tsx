@@ -108,6 +108,13 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     };
 
     useEffect(() => {
+        setBirdImages({});
+        setPage(0);
+        setSelectedGroup('All Groups');
+    }, [setBirdImages, setPage, setSelectedGroup]);
+
+
+    useEffect(() => {
         if (Object.keys(birds).length > 0) {
             const uniqueGroups = getUniqueGroups(birds, taxonomies);
             setGroups(uniqueGroups);
