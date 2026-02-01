@@ -13,10 +13,9 @@ interface BirdListProps {
 }
 
 const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
-    const { birdImages, setBirdImages, page, setPage } = useContext(BirdContext);
+    const { birdImages, setBirdImages, page, setPage, selectedGroup, setSelectedGroup } = useContext(BirdContext);
     const [orderedBirds, setOrderedBirds] = useState<[string, string][]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [selectedGroup, setSelectedGroup] = useState<string>('All Groups');
     const [groups, setGroups] = useState<string[]>([]);
     const batchSize = Number(process.env.NEXT_PUBLIC_BATCH_SIZE);
 
@@ -107,15 +106,22 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         });
     };
 
-    useEffect(() => {
-        setBirdImages({});
-        setPage(0);
-        setSelectedGroup('All Groups');
-    }, [setBirdImages, setPage, setSelectedGroup]);
+    const groupBirdsByTaxonomy = (birdList: [string, string][]) => {
+        const groups: Record<string, [string, string][]> = {};
 
+        birdList.forEach(([name, speciesCode]) => {
+            const birdGroup = taxonomies[speciesCode] || 'Unknown';
+            if (!groups[birdGroup]) {
+                groups[birdGroup] = [];
+            }
+            groups[birdGroup].push([name, speciesCode]);
+        });
+
+        return groups;
+    };
 
     useEffect(() => {
-        if (Object.keys(birds).length > 0) {
+        if (Object.keys(orderedBirds).length === 0 && Object.keys(birds).length > 0) {
             const uniqueGroups = getUniqueGroups(birds, taxonomies);
             setGroups(uniqueGroups);
 
@@ -123,111 +129,106 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
             const sorted = sortBirdsByTaxonomy(birds, taxonomies, allGroups);
             setOrderedBirds(sorted);
         }
-    }, [birds, taxonomies]);
+    }, [birds, taxonomies, orderedBirds]);
 
     useEffect(() => {
-        if (orderedBirds.length > 0) {
-            const filtered = filterBirdsByGroup(orderedBirds, selectedGroup);
-            if (selectedGroup === 'All Groups') {
-                if (page < Math.ceil(filtered.length / batchSize)) {
-                    const currentBatch = filtered
-                        .slice(page * batchSize, (page + 1) * batchSize)
-                        .reduce((acc: Record<string, string>, [name, code]) => {
-                            acc[name] = code;
-                            return acc;
-                        }, {});
-                    setIsLoading(true);
-                    fetchBatchImages(currentBatch).finally(() => setIsLoading(false));
-                }
-            } else {
-                const allBirdsInGroup = filtered.reduce((acc: Record<string, string>, [name, code]) => {
+        if (orderedBirds.length === 0) return;
+
+        const filtered = filterBirdsByGroup(orderedBirds, selectedGroup);
+
+        if (selectedGroup === 'All Groups') {
+            const start = page * batchSize;
+            const end = (page + 1) * batchSize;
+            const currentBatch = filtered.slice(start, end)
+                .reduce((acc: Record<string, string>, [name, code]) => {
                     acc[name] = code;
                     return acc;
                 }, {});
+            if (Object.keys(currentBatch).length > 0) {
                 setIsLoading(true);
-                fetchBatchImages(allBirdsInGroup).finally(() => setIsLoading(false));
+                fetchBatchImages(currentBatch).finally(() => setIsLoading(false));
             }
+        } else {
+            const allBirdsInGroup = filtered.reduce((acc: Record<string, string>, [name, code]) => {
+                acc[name] = code;
+                return acc;
+            }, {});
+            setIsLoading(true);
+            fetchBatchImages(allBirdsInGroup).finally(() => setIsLoading(false));
         }
     }, [orderedBirds, selectedGroup, page]);
 
     const loadMore = () => {
-        if (!isLoading && page < Math.ceil(orderedBirds.length / batchSize)) {
+        if (!isLoading && page < Math.ceil(filterBirdsByGroup(orderedBirds, selectedGroup).length / batchSize) - 1) {
             setPage(prevPage => prevPage + 1);
         }
     };
+    
+    const filteredBirds = filterBirdsByGroup(orderedBirds, selectedGroup);
+    const paginatedBirds =
+        selectedGroup === 'All Groups'
+            ? orderedBirds.slice(0, (page + 1) * batchSize)
+            : orderedBirds.filter(([name, code]) => taxonomies[code] === selectedGroup);
+    const groupedBirds =
+        selectedGroup === 'All Groups'
+            ? groupBirdsByTaxonomy(paginatedBirds)
+            : { [selectedGroup]: paginatedBirds };
 
     return (
-        <div>
-            <select
-                value={selectedGroup}
-                onChange={(e) => {
-                    setSelectedGroup(e.target.value);
-                    setPage(0);
-                    setBirdImages({});
-                }}
-                style={{ marginBottom: '16px', padding: '8px' }}
-            >
-                {groups.map(group => (
-                    <option key={group} value={group}>{group}</option>
-                ))}
-            </select>
+<div>
+  <select
+    value={selectedGroup}
+    onChange={(e) => {
+      setSelectedGroup(e.target.value);
+      setPage(0);
+    }}
+    style={{ marginBottom: '16px', padding: '8px' }}
+  >
+    {groups.map(group => (
+      <option key={group} value={group}>{group}</option>
+    ))}
+  </select>
 
-            <ul style={{ listStyleType: 'none', paddingLeft: 0 }}>
-                {Object.entries(birdImages).map(([name, birdImageUrl]) => {
-                    const speciesCode = birds[name];
-                    const birdGroup = taxonomies[speciesCode];
-                    const shouldShow = selectedGroup === 'All Groups' || birdGroup === selectedGroup;
+  {Object.entries(groupedBirds).map(([groupName, groupBirds]) => (
+    <div key={groupName}>
+      {selectedGroup === 'All Groups' && (
+        <h3 style={{ backgroundColor: '#f0f0f0', padding: '8px' }}>{groupName}</h3>
+      )}
 
-                    if (!shouldShow) return null;
-
-                    const handleClick = () => router.push(`/?species=${speciesCode}`);
-
-                    return (
-                        <li key={name} style={{
-                            cursor: 'default',
-                            padding: '4px 8px',
-                            backgroundColor: '#f5f5f5',
-                            marginTop: '2px',
-                            display: 'flex',
-                            alignItems: 'center'
-                        }}>
-                            {birdImageUrl && (
-                                <img
-                                    src={birdImageUrl}
-                                    alt={name}
-                                    style={{
-                                        width: '40px',
-                                        height: 'auto',
-                                        marginRight: '8px',
-                                        transition: 'transform 0.3s ease-in-out',
-                                        cursor: 'pointer'
-                                    }}
-                                    onMouseOver={(e) => {
-                                        (e.target as HTMLElement).style.transform = 'scale(2)';
-                                    }}
-                                    onMouseOut={(e) => {
-                                        (e.target as HTMLElement).style.transform = 'scale(1)';
-                                    }}
-                                    loading="lazy"
-                                />
-                            )}
-                            <span onClick={handleClick} style={{ cursor: 'pointer' }}>
-                                {name}
-                            </span>
-                        </li>
-                    );
-                })}
-            </ul>
-            {isLoading && <p>Loading...</p>}
-            {selectedGroup === 'All Groups' && (
-                <button
-                    onClick={loadMore}
-                    disabled={isLoading || page >= Math.ceil(Object.keys(birds).length / batchSize)}
-                >
-                    Load More
-                </button>
+      <div className="bird-grid">
+        {groupBirds.map(([name, speciesCode]) => (
+          <div className="bird-card" key={name}>
+            {birdImages[name] && (
+              <img
+                src={birdImages[name]}
+                alt={name}
+                className="bird-image"
+                loading="lazy"
+              />
             )}
-        </div>
+            <span
+                onClick={() => router.push(`/?species=${speciesCode}`)}
+                style={{ cursor: 'pointer' }}
+            >
+              {name}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  ))}
+
+  {isLoading && <p>Loading...</p>}
+  {selectedGroup === 'All Groups' && (
+    <button
+      onClick={loadMore}
+      disabled={isLoading || (page + 1) * batchSize >= filteredBirds.length}
+    >
+      Load More
+    </button>
+  )}
+</div>
+
     );
 };
 

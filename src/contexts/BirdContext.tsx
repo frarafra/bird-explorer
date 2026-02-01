@@ -14,6 +14,8 @@ interface BirdContextType {
     setTaxonomies: React.Dispatch<React.SetStateAction<Record<string, string>>>;
     page: number;
     setPage: React.Dispatch<React.SetStateAction<number>>;
+    selectedGroup: string;
+    setSelectedGroup: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export const BirdContext = createContext<BirdContextType>({
@@ -31,7 +33,9 @@ export const BirdContext = createContext<BirdContextType>({
     },
     setMapCenter: () => {},
     page: 0,
-    setPage: () => {}
+    setPage: () => {},
+    selectedGroup: 'All Groups',
+    setSelectedGroup: () => {}
 });
 
 interface BirdProviderProps {
@@ -43,6 +47,7 @@ export const BirdProvider: FC<BirdProviderProps> = ({ children }) => {
     const [birdImages, setBirdImages] = useState<Record<string, string>>({});
     const [observations, setObservations] = useState<Result[]>([]);
     const [taxonomies, setTaxonomies] = useState<Record<string, string>>({});
+    const [selectedGroup, setSelectedGroup] = useState<string>('All Groups');
     const [mapCenter, setMapCenter] = useState<{
         lat: number;
         lng: number;
@@ -59,7 +64,8 @@ export const BirdProvider: FC<BirdProviderProps> = ({ children }) => {
 
     return (
         <BirdContext.Provider value={{ birds, setBirds, birdImages, setBirdImages, 
-            observations, setObservations,taxonomies, setTaxonomies, mapCenter, setMapCenter, page, setPage }}>
+            observations, setObservations,taxonomies, setTaxonomies, mapCenter, setMapCenter, 
+            selectedGroup, setSelectedGroup, page, setPage }}>
             {children}
         </BirdContext.Provider>
     );
