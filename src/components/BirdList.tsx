@@ -135,6 +135,9 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         if (orderedBirds.length === 0) return;
 
         const filtered = filterBirdsByGroup(orderedBirds, selectedGroup);
+        if (filtered.length === 0) {
+            setSelectedGroup('All Groups');
+        };
 
         if (selectedGroup === 'All Groups') {
             const start = page * batchSize;
