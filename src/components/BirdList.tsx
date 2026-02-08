@@ -207,6 +207,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                 alt={name}
                 className="bird-image"
                 loading="lazy"
+                decoding="async"
               />
             )}
             <span
