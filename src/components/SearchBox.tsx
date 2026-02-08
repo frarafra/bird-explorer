@@ -29,11 +29,12 @@ const getExtendedSuggestions = async (bird: string) => {
 };
 
 const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
+    const { birds, setObservations, taxonomies } = useContext(BirdContext);
     const [bird, setBird] = useState('');
     const [extendedBird, setExtendedBird] = useState<Record<string, string>>({});
-    const { birds, setObservations, taxonomies } = useContext(BirdContext);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [extendedSuggestions, setExtendedSuggestions] = useState<Record<string, string>[]>([]);
+    const [suggestionSelected, setSuggestionSelected] = useState(false);
     const isInitialMount = useRef(true);
     const router = useRouter();
 
@@ -96,6 +97,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
         setExtendedBird({});
         setSuggestions([]);
         setExtendedSuggestions([]);
+        setSuggestionSelected(false);
 
         const queryParams = new URLSearchParams();
         queryParams.set('species', birdCode);
@@ -115,7 +117,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
                     onChange={(e) => setBird(e.target.value)}
                     placeholder="Search for birds..."
                 />
-                <button type="submit">Search</button>
+                <button type="submit" disabled={!suggestionSelected}>Search</button>
             </form>
 
             {suggestions.length > 0 && (
@@ -124,6 +126,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
                         <li
                             key={index}
                             onClick={() => {
+                                setSuggestionSelected(true);
                                 setBird(suggestion);
                                 setSuggestions([]);
                                 setExtendedBird({});
@@ -149,6 +152,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
                             <li
                                 key={index}
                                 onClick={() => {
+                                    setSuggestionSelected(true);
                                     setExtendedBird(suggestion);
                                     setBird(suggestion.name);
                                     setSuggestions([]);
