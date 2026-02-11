@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-const AWS_EBIRD_ENDPOINT = process.env.NEXT_PUBLIC_AWS_EBIRD_ENDPOINT;
 const EBIRD_API_TAXON_FIND = 'https://api.ebird.org/v2/ref/taxonomy/ebird';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -12,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   let taxons: Record<string, string>[] | undefined = [];
   try {
-    const response = await fetch(`${AWS_EBIRD_ENDPOINT}?query=${bird}`);
+    const response = await fetch(`${process.env.NEXT_PUBLIC_AWS_EBIRD_ENDPOINT}?query=${bird}`);
     if (!response.ok) {
       throw new Error('Failed to fetch taxon data from AWS endpoint');
     }
