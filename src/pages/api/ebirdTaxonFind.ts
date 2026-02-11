@@ -1,19 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import { getTypesenseClient } from '../../client/typesense';
-
-const EBIRD_API_TAXON_FIND = 'https://api.ebird.org/v2/ref/taxon/find';
-
-const typesenseClient = getTypesenseClient();
-
-interface EBirdTaxonomy {
-  primary_com_name: string;
-  sci_name: string;
-  order: string;
-  family: string;
-  taxon_order: number;
-  species_code: string;
-}
+const AWS_EBIRD_ENDPOINT = process.env.NEXT_PUBLIC_AWS_EBIRD_ENDPOINT;
+const EBIRD_API_TAXON_FIND = 'https://api.ebird.org/v2/ref/taxonomy/ebird';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { bird } = req.query;
@@ -24,17 +12,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   let taxons: Record<string, string>[] | undefined = [];
   try {
-    const results = await typesenseClient.collections<EBirdTaxonomy>('ebird_taxonomy')
-      .documents()
-      .search({
-        q: bird as string,
-        query_by: 'primary_com_name',
-        per_page: 150,
-        facet_by: 'order,family',
-        filter_by: 'category:species'
-      });
+    const response = await fetch(`${AWS_EBIRD_ENDPOINT}?query=${bird}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch taxon data from AWS endpoint');
+    }
 
-    taxons = results?.hits?.map(hit => ({ name: hit.document?.primary_com_name, code: hit.document?.species_code }));
+    const data = await response.json();
+    taxons = data.results?.map((result: { common_name: string; species_code: string; }) => ({ name: result.common_name, code: result.species_code }));
 
     if (taxons?.length === 0) {
       const response = await fetch(`${EBIRD_API_TAXON_FIND}?cat=species&key=${process.env.NEXT_PUBLIC_EBIRD_API_TAXON_FIND_TOKEN}&q=${bird}&count=150`);
