@@ -45,6 +45,10 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
             return; 
         }
 
+        if (suggestionSelected) {
+            return;
+        }
+
         const debounceTimeout = setTimeout(() => {
             if (bird.length > 1) {
                 const birdNames = Object.keys(birds);
