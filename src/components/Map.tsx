@@ -119,7 +119,8 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId,
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/ebirdSpeciesSearch?lat=${lat}&lng=${lng}&dist=10`);
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/ebirdSpeciesSearch?lat=${lat}&lng=${lng}&dist=10&_=${timestamp}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch birds: ${response.statusText}`);
       }

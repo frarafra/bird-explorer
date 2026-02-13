@@ -51,7 +51,7 @@ const HomePage = () => {
     
     const fetchBirds = async (newLat?: string, newLng?: string) => {
         try {
-            const response = await fetch(`/api/ebirdSpeciesSearch?lat=${newLat}&lng=${newLng}`);
+            const response = await fetch(`/api/ebirdSpeciesSearch?lat=${newLat}&lng=${newLng}&_=${new Date().getTime()}`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch birds: ${response.statusText}`);
             }
@@ -69,7 +69,8 @@ const HomePage = () => {
 
     const fetchTaxonomies = async (speciesCodes: string[]) => {
         try {
-            const response = await fetch(`/api/taxonomy/species?speciesCodes=${speciesCodes.join(',')}`);
+            const timestamp = new Date().getTime();
+            const response = await fetch(`/api/taxonomy/species?speciesCodes=${speciesCodes.join(',')}&_=${timestamp}`);
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch taxonomies: ${response.statusText}`);
@@ -88,9 +89,10 @@ const HomePage = () => {
 
         const lat = latParam as string || mapCenter.lat.toString();
         const lng = lngParam as string || mapCenter.lng.toString();
+        const timestamp = new Date().getTime();
         let nearObservations = [];
         try {
-            const response = await fetch(`/api/ebirdObservations?bird=${bird}&lat=${lat}&lng=${lng}`);
+            const response = await fetch(`/api/ebirdObservations?bird=${bird}&lat=${lat}&lng=${lng}&_=${timestamp}`);
             nearObservations = await response.json();
         } catch (error) {
             console.error(error);
