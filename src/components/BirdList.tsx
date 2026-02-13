@@ -21,6 +21,12 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
 
     const router = useRouter();
 
+    useEffect(() => {
+        if (!selectedGroup) {
+            setSelectedGroup('All Groups');
+        }
+    }, [selectedGroup]);
+
     const fetchBatchImages = async (batch: Record<string, string>) => {
         try {
             const response = await fetch('/api/ebirdImages', {
@@ -162,7 +168,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     }, [orderedBirds, selectedGroup, page]);
 
     const loadMore = () => {
-        if (!isLoading && page < Math.ceil(filterBirdsByGroup(orderedBirds, selectedGroup).length / batchSize) - 1) {
+        if (!isLoading && page < Math.ceil(filteredBirds.length / batchSize) - 1) {
             setPage(prevPage => prevPage + 1);
         }
     };
