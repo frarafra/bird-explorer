@@ -14,7 +14,8 @@ interface ExtendedSuggestion {
 
 const getExtendedSuggestions = async (bird: string) => {
     try {
-        const response = await fetch(`/api/ebirdTaxonFind?bird=${bird}`);
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/ebirdTaxonFind?bird=${bird}&_=${timestamp}`);
         if (!response.ok) throw new Error('Failed to fetch species');
 
         const speciesData = await response.json();
@@ -43,46 +44,50 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
             isInitialMount.current = false; 
             return; 
         }
- 
-        if (bird.length > 1) {
-            const birdNames = Object.keys(birds);
-            const fuse = new Fuse(birdNames, {
-                distance: process.env.NEXT_PUBLIC_FUSE_DISTANCE ? parseInt(process.env.NEXT_PUBLIC_FUSE_DISTANCE) : 100,
-                includeScore: true,
-                threshold: process.env.NEXT_PUBLIC_FUSE_THRESHOLD ? parseFloat(process.env.NEXT_PUBLIC_FUSE_THRESHOLD) : 0.4,
-            });
-            const fuzzyResults = fuse.search(bird)
-                .filter(result => result.score !== undefined && result.score < 0.4)
-                .map(result => result.item);
-            
-            if (fuzzyResults.length > 0) {
-                if (bird.length > 4 && taxonomies[birds[fuzzyResults[0]]]) {
-                    const firstFamily = taxonomies[birds[fuzzyResults[0]]];
-                    fuzzyResults.push(...birdNames.filter(suggestion =>
-                        !fuzzyResults.includes(suggestion)
-                        && taxonomies[birds[suggestion]] === firstFamily
-                    ).slice(0, 4 - (fuzzyResults.length > 1 ? 1 : 0)));
-                }
 
-                setSuggestions(fuzzyResults);
-                setExtendedSuggestions([]);
+        const debounceTimeout = setTimeout(() => {
+            if (bird.length > 1) {
+                const birdNames = Object.keys(birds);
+                const fuse = new Fuse(birdNames, {
+                    distance: process.env.NEXT_PUBLIC_FUSE_DISTANCE ? parseInt(process.env.NEXT_PUBLIC_FUSE_DISTANCE) : 100,
+                    includeScore: true,
+                    threshold: process.env.NEXT_PUBLIC_FUSE_THRESHOLD ? parseFloat(process.env.NEXT_PUBLIC_FUSE_THRESHOLD) : 0.4,
+                });
+                const fuzzyResults = fuse.search(bird)
+                    .filter(result => result.score !== undefined && result.score < 0.4)
+                    .map(result => result.item);
+
+                if (fuzzyResults.length > 0) {
+                    if (bird.length > 4 && taxonomies[birds[fuzzyResults[0]]]) {
+                        const firstFamily = taxonomies[birds[fuzzyResults[0]]];
+                        fuzzyResults.push(...birdNames.filter(suggestion =>
+                            !fuzzyResults.includes(suggestion)
+                            && taxonomies[birds[suggestion]] === firstFamily
+                        ).slice(0, 4 - (fuzzyResults.length > 1 ? 1 : 0)));
+                    }
+
+                    setSuggestions(fuzzyResults);
+                    setExtendedSuggestions([]);
+                } else {
+                    if (bird.length > 2) {
+                        const extendedSuggestions = async () => {
+                            const suggestions = await getExtendedSuggestions(bird);
+                            setExtendedSuggestions(suggestions?.map(({name, code}: ExtendedSuggestion) => ({
+                                name: name.split(' - ')[0],
+                                code: code
+                            })).sort((a: ExtendedSuggestion, b: ExtendedSuggestion) => a.name.localeCompare(b.name)));
+                        };
+                        extendedSuggestions();
+                        setSuggestions([]);
+                    }            
+                }
             } else {
-                if (bird.length > 2) {
-                    const extendedSuggestions = async () => {
-                        const suggestions = await getExtendedSuggestions(bird);
-                        setExtendedSuggestions(suggestions?.map(({name, code}: ExtendedSuggestion) => ({
-                            name: name.split(' - ')[0],
-                            code: code
-                        })).sort((a: ExtendedSuggestion, b: ExtendedSuggestion) => a.name.localeCompare(b.name)));
-                    };
-                    extendedSuggestions();
-                    setSuggestions([]);
-                }            
+                setSuggestions([]);
+                setExtendedSuggestions([]);
             }
-        } else {
-            setSuggestions([]);
-            setExtendedSuggestions([]);
-        }
+        }, 100);
+
+        return () => clearTimeout(debounceTimeout);
     }, [bird]);
 
     const handleSubmit = async (event: React.FormEvent) => {
