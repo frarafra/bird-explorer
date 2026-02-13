@@ -22,10 +22,19 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     const router = useRouter();
 
     useEffect(() => {
-        if (!selectedGroup) {
-            setSelectedGroup('All Groups');
+        if (Object.keys(birds).length > 0 && Object.keys(taxonomies).length > 0) {
+            const uniqueGroups = getUniqueGroups(birds, taxonomies);
+            setGroups(uniqueGroups);
+
+            if (!selectedGroup || !uniqueGroups.includes(selectedGroup)) {
+                setSelectedGroup('All Groups');
+            }
+
+            const allGroups = Array.from(new Set(Object.values(taxonomies))).filter(Boolean);
+            const sorted = sortBirdsByTaxonomy(birds, taxonomies, allGroups);
+            setOrderedBirds(sorted);
         }
-    }, [selectedGroup]);
+    }, [birds, taxonomies]);
 
     const fetchBatchImages = async (batch: Record<string, string>) => {
         try {
@@ -130,6 +139,10 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         if (Object.keys(orderedBirds).length === 0 && Object.keys(birds).length > 0) {
             const uniqueGroups = getUniqueGroups(birds, taxonomies);
             setGroups(uniqueGroups);
+
+            if (!selectedGroup || !uniqueGroups.includes(selectedGroup)) {
+                setSelectedGroup('All Groups');
+            }
 
             const allGroups = Array.from(new Set(Object.values(taxonomies))).filter(Boolean);
             const sorted = sortBirdsByTaxonomy(birds, taxonomies, allGroups);
