@@ -79,7 +79,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
                             setExtendedSuggestions(suggestions?.map(({name, code}: ExtendedSuggestion) => ({
                                 name: name.split(' - ')[0],
                                 code: code
-                            })).sort((a: ExtendedSuggestion, b: ExtendedSuggestion) => a.name.localeCompare(b.name)));
+                            })));
                         };
                         extendedSuggestions();
                         setSuggestions([]);
