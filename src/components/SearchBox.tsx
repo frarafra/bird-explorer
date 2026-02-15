@@ -73,17 +73,17 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
                     setSuggestions(fuzzyResults);
                     setExtendedSuggestions([]);
                 } else {
-                    if (bird.length > 2) {
-                        const extendedSuggestions = async () => {
-                            const suggestions = await getExtendedSuggestions(bird);
+                    const extendedSuggestions = async () => {
+                        const suggestions = await getExtendedSuggestions(bird);
+                        if (bird.length > 3) {
                             setExtendedSuggestions(suggestions?.map(({name, code}: ExtendedSuggestion) => ({
                                 name: name.split(' - ')[0],
                                 code: code
                             })));
-                        };
-                        extendedSuggestions();
-                        setSuggestions([]);
-                    }            
+                        }
+                    };
+                    extendedSuggestions();
+                    setSuggestions([]);
                 }
             } else {
                 setSuggestions([]);
