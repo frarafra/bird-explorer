@@ -19,8 +19,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const data = await response.json();
     taxons = data.results?.map((result: { common_name: string; species_code: string; }) => ({ name: result.common_name, code: result.species_code }));
 
-    if (taxons?.length === 0) {
-      const response = await fetch(`${EBIRD_API_TAXON_FIND}?cat=species&key=${process.env.NEXT_PUBLIC_EBIRD_API_TAXON_FIND_TOKEN}&q=${bird}&count=150`);
+    if (taxons?.length === 0 && bird.length > 3) {
+      const response = await fetch(`${EBIRD_API_TAXON_FIND}?cat=species&fmt=json&key=${process.env.NEXT_PUBLIC_EBIRD_API_TAXON_FIND_TOKEN}&q=${bird}&count=150`);
       if (!response.ok) {
         throw new Error('Failed to fetch taxon data from eBird API');
       }
