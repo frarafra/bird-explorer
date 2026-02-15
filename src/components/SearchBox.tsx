@@ -12,10 +12,10 @@ interface ExtendedSuggestion {
     code: string;
 }
 
-const getExtendedSuggestions = async (bird: string) => {
+const getExtendedSuggestions = async (bird: string, signal: AbortSignal) => {
     try {
         const timestamp = new Date().getTime();
-        const response = await fetch(`/api/ebirdTaxonFind?bird=${bird}&_=${timestamp}`);
+        const response = await fetch(`/api/ebirdTaxonFind?bird=${bird}&_=${timestamp}`, { signal });
         if (!response.ok) throw new Error('Failed to fetch species');
 
         const speciesData = await response.json();
@@ -49,6 +49,9 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
             return;
         }
 
+        const controller = new AbortController();
+        const signal = controller.signal;
+
         const debounceTimeout = setTimeout(() => {
             if (bird.length > 1) {
                 const birdNames = Object.keys(birds);
@@ -74,7 +77,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
                     setExtendedSuggestions([]);
                 } else {
                     const extendedSuggestions = async () => {
-                        const suggestions = await getExtendedSuggestions(bird);
+                        const suggestions = await getExtendedSuggestions(bird, signal);
                         if (bird.length > 3) {
                             setExtendedSuggestions(suggestions?.map(({name, code}: ExtendedSuggestion) => ({
                                 name: name.split(' - ')[0],
@@ -89,9 +92,12 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
                 setSuggestions([]);
                 setExtendedSuggestions([]);
             }
-        }, 100);
+        }, 300);
 
-        return () => clearTimeout(debounceTimeout);
+        return () => {
+            clearTimeout(debounceTimeout);
+            controller.abort();
+        };
     }, [bird]);
 
     const handleSubmit = async (event: React.FormEvent) => {
