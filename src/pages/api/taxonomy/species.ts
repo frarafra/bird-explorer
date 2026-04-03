@@ -51,7 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const taxonomies = await ebirdTaxonomySearch(speciesCodes.split(','));
     res.status(200).json(taxonomies);
   } catch (error) {
-    console.error('Error in /api/taxonomy/speciesr:', error);
+    console.error('Error in /api/taxonomy/species:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 }
