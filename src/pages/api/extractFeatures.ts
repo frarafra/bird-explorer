@@ -1,5 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
+import { getRedisClient } from '../../client/redis';
+
+const redis = getRedisClient();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -7,6 +10,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const birds = req.body.birds as [string, string][]; 
     const birdImages = req.body.birdImages as Record<string, string>;
+    const cacheKey = `clusters-${JSON.stringify(birds)}`;
+
+    const cachedResult = await redis.get(cacheKey);
+    if (cachedResult) {
+      return res.status(200).json(JSON.parse(cachedResult));
+    }
+
     const payload = {
       birds,
       birdImages
@@ -78,6 +88,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const missingBirds = birds.filter(([, code]: [string, string]) => !processedCodes.has(code));
     const result = [...finalSortedBirds, ...missingBirds];
+
+    await redis.set(cacheKey, JSON.stringify(result), 'EX', 15 * 60); // Cache for 15 minutes
 
     res.status(200).json(result);
 
