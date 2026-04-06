@@ -90,7 +90,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                 setSortedBirds([]); // Clear the bird list at the start of clustering
                 setIsProcessing(true); // Set processing state
 
-                const response = await fetch('/api/extractFeatures', {
+                const response = await fetch('/api/ebirdSimilarImages', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ birds: allBirds, birdImages: images }),

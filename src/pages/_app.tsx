@@ -9,7 +9,7 @@ function MyApp({ Component, pageProps }: AppProps) {
             try {
                 const results = await Promise.allSettled([
                     fetch(`/api/ebirdTaxonFind?bird=ou`),
-                    fetch('/api/extractFeatures', {
+                    fetch('/api/ebirdSimilarImages', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ birds: ['ou'], birdImages: { 'ou': process.env.NEXT_PUBLIC_EBIRD_IMAGE_URL } }),
