@@ -9,11 +9,13 @@
     "start": "next start"
   },
   "dependencies": {
-    "@aws-sdk/client-lambda": "^3.1022.0",
+    "@aws-sdk/client-dynamodb": "3.490.0",
+    "@aws-sdk/client-lambda": "3.1022.0",
+    "@aws-sdk/lib-dynamodb": "3.1032.0",
     "axios": "1.13.2",
     "axios-cookiejar-support": "6.0.4",
     "cheerio": "1.1.2",
-    "fuse.js": "^7.1.0",
+    "fuse.js": "7.1.0",
     "ioredis": "5.8.2",
     "leaflet": "1.9.4",
     "next": "latest",

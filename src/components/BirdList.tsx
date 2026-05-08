@@ -1,6 +1,7 @@
 import React, { FC, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { BirdContext } from '../contexts/BirdContext';
+import { fetchBirdsFilters } from '../utils/birdTaxonomyClient';
 
 interface BirdData {
     name: string;
@@ -13,109 +14,175 @@ interface BirdListProps {
 }
 
 const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
-    const { birdImages, setBirdImages, page, setPage, selectedGroup, setSelectedGroup } = useContext(BirdContext);
+    const {
+        birdImages,
+        setBirdImages,
+        page,
+        setPage,
+        selectedGroup,
+        setSelectedGroup
+    } = useContext(BirdContext);
+
     const [orderedBirds, setOrderedBirds] = useState<[string, string][]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [groups, setGroups] = useState<string[]>([]);
-    const [sortMethod, setSortMethod] = useState<'default' | 'similarity'>('default');
+
+    const [sortMethod, setSortMethod] = useState<'default' | 'similarity'>(
+        'default'
+    );
+
     const [sortedBirds, setSortedBirds] = useState<[string, string][]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
+
+    const [keywordsByCategory, setKeywordsByCategory] = useState<
+        Record<string, Set<string>>
+    >({});
+
+    const [isLoadingKeywords, setIsLoadingKeywords] = useState(false);
+
+    const [birdKeywords, setBirdKeywords] = useState<
+        Record<string, string[]>
+    >({});
+
+    const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(
+        new Set()
+    );
+
+    const [filtersOpen, setFiltersOpen] = useState(false);
+
     const batchSize = Number(process.env.NEXT_PUBLIC_BATCH_SIZE);
 
     const router = useRouter();
 
     useEffect(() => {
-        if (Object.keys(birds).length > 0 && Object.keys(taxonomies).length > 0) {
+        if (selectedKeywords.size > 0) {
+            setFiltersOpen(true);
+        }
+    }, [selectedKeywords]);
+
+    useEffect(() => {
+        if (
+            Object.keys(birds).length > 0 &&
+            Object.keys(taxonomies).length > 0
+        ) {
             const uniqueGroups = getUniqueGroups(birds, taxonomies);
+
             setGroups(uniqueGroups);
 
-            if (!selectedGroup || !uniqueGroups.includes(selectedGroup)) {
+            if (
+                !selectedGroup ||
+                !uniqueGroups.includes(selectedGroup)
+            ) {
                 setSelectedGroup('All Groups');
             }
 
-            const allGroups = Array.from(new Set(Object.values(taxonomies))).filter(Boolean);
-            const sorted = sortBirdsByTaxonomy(birds, taxonomies, allGroups);
+            const allGroups = Array.from(
+                new Set(Object.values(taxonomies))
+            ).filter(Boolean);
+
+            const sorted = sortBirdsByTaxonomy(
+                birds,
+                taxonomies,
+                allGroups
+            );
+
             setOrderedBirds(sorted);
         }
     }, [birds, taxonomies]);
 
     useEffect(() => {
-        if (Object.keys(orderedBirds).length === 0 && Object.keys(birds).length > 0) {
-            const uniqueGroups = getUniqueGroups(birds, taxonomies);
-            setGroups(uniqueGroups);
-
-            if (!selectedGroup || !uniqueGroups.includes(selectedGroup)) {
-                setSelectedGroup('All Groups');
-            }
-
-            const allGroups = Array.from(new Set(Object.values(taxonomies))).filter(Boolean);
-            const sorted = sortBirdsByTaxonomy(birds, taxonomies, allGroups);
-            setOrderedBirds(sorted);
-        }
-    }, [birds, taxonomies, orderedBirds]);
-
-    useEffect(() => {
         if (orderedBirds.length === 0) return;
 
-        const filtered = filterBirdsByGroup(orderedBirds, selectedGroup);
+        const filtered = filterBirdsByGroup(
+            orderedBirds,
+            selectedGroup
+        );
+
         if (filtered.length === 0) {
             setSelectedGroup('All Groups');
-        };
+        }
 
         if (selectedGroup === 'All Groups') {
             const start = page * batchSize;
             const end = (page + 1) * batchSize;
-            const currentBatch = filtered.slice(start, end)
+
+            const currentBatch = filtered
+                .slice(start, end)
                 .reduce((acc: Record<string, string>, [name, code]) => {
                     acc[name] = code;
                     return acc;
                 }, {});
+
             if (Object.keys(currentBatch).length > 0) {
                 setIsLoading(true);
-                fetchBatchImages(currentBatch).finally(() => setIsLoading(false));
+
+                fetchBatchImages(currentBatch).finally(() =>
+                    setIsLoading(false)
+                );
             }
         } else {
-            const allBirdsInGroup = filtered.reduce((acc: Record<string, string>, [name, code]) => {
-                acc[name] = code;
-                return acc;
-            }, {});
+            const allBirdsInGroup = filtered.reduce(
+                (acc: Record<string, string>, [name, code]) => {
+                    acc[name] = code;
+                    return acc;
+                },
+                {}
+            );
+
             setIsLoading(true);
-            fetchBatchImages(allBirdsInGroup).finally(() => setIsLoading(false));
+
+            fetchBatchImages(allBirdsInGroup).finally(() =>
+                setIsLoading(false)
+            );
         }
     }, [orderedBirds, selectedGroup, page]);
 
     useEffect(() => {
-       const clusterBirds = async (allBirds: [string, string][], images: Record<string, string>) => {
+        const clusterBirds = async (
+            allBirds: [string, string][],
+            images: Record<string, string>
+        ) => {
             try {
-                setSortedBirds([]); // Clear the bird list at the start of clustering
-                setIsProcessing(true); // Set processing state
+                setSortedBirds([]);
+                setIsProcessing(true);
 
-                const response = await fetch('/api/ebirdSimilarImages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ birds: allBirds, birdImages: images }),
-                });
+                const response = await fetch(
+                    '/api/ebirdSimilarImages',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            birds: allBirds,
+                            birdImages: images
+                        })
+                    }
+                );
 
                 if (!response.ok) {
-                    console.error('Feature extraction failed');
                     setSortedBirds(allBirds);
                     return;
                 }
 
-                const sortedData: [string, string][] = await response.json();
-                
+                const sortedData: [string, string][] =
+                    await response.json();
+
                 setSortedBirds(sortedData);
             } catch (err) {
                 console.error('Clustering error:', err);
-                setSortedBirds(allBirds); // Fallback to original order on error
+                setSortedBirds(allBirds);
             } finally {
-                setIsProcessing(false); // Reset processing state
+                setIsProcessing(false);
             }
         };
 
-        if (sortMethod === 'similarity' && Object.keys(groupedBirds).length > 0) {
+        if (
+            sortMethod === 'similarity' &&
+            Object.keys(groupedBirds).length > 0
+        ) {
             const allBirds = Object.values(groupedBirds).flat();
-            
+
             if (allBirds.length > 0) {
                 clusterBirds(allBirds, birdImages);
             }
@@ -124,23 +191,92 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         }
     }, [sortMethod, orderedBirds, birdImages]);
 
-    const fetchBatchImages = async (batch: Record<string, string>) => {
+    useEffect(() => {
+        const fetchAndProcessKeywords = async () => {
+            if (selectedGroup === 'All Groups') {
+                setKeywordsByCategory({});
+                setBirdKeywords({});
+                setSelectedKeywords(new Set());
+
+                return;
+            }
+
+            try {
+                setIsLoadingKeywords(true);
+
+                const groupBirds = orderedBirds
+                    .filter(
+                        ([name, speciesCode]) =>
+                            taxonomies[speciesCode] ===
+                            selectedGroup
+                    )
+                    .map(([name]) => name);
+
+                if (groupBirds.length === 0) {
+                    setKeywordsByCategory({});
+                    setBirdKeywords({});
+                    setSelectedKeywords(new Set());
+
+                    return;
+                }
+
+                const {
+                    keywordsMap,
+                    birdKeywords: fetchedBirdKeywords
+                } = await fetchBirdsFilters(groupBirds);
+
+                setKeywordsByCategory(keywordsMap);
+
+                setBirdKeywords(fetchedBirdKeywords || {});
+
+                setSelectedKeywords(new Set());
+            } catch (error) {
+                console.error(
+                    'Error fetching bird keywords:',
+                    error
+                );
+
+                setKeywordsByCategory({});
+                setBirdKeywords({});
+                setSelectedKeywords(new Set());
+            } finally {
+                setIsLoadingKeywords(false);
+            }
+        };
+
+        fetchAndProcessKeywords();
+    }, [selectedGroup, orderedBirds, taxonomies]);
+
+    const fetchBatchImages = async (
+        batch: Record<string, string>
+    ) => {
         try {
             const response = await fetch('/api/ebirdImages', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(batch),
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(batch)
             });
 
-            if (!response.ok) throw new Error('Failed to fetch images');
+            if (!response.ok) {
+                throw new Error('Failed to fetch images');
+            }
 
             const data = await response.json();
+
             setBirdImages(prev => ({
                 ...prev,
-                ...data.reduce((acc: Record<string, string>, bird: BirdData) => {
-                    acc[bird.name] = bird.imageUrl;
-                    return acc;
-                }, {}),
+                ...data.reduce(
+                    (
+                        acc: Record<string, string>,
+                        bird: BirdData
+                    ) => {
+                        acc[bird.name] = bird.imageUrl;
+                        return acc;
+                    },
+                    {}
+                )
             }));
         } catch (error) {
             console.error('Error fetching images:', error);
@@ -152,185 +288,452 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         taxonomies: Record<string, string>,
         orderedGroups: string[]
     ) => {
-        const findGroupIndex = (group: string): number => {
-            let index = orderedGroups.indexOf(group);
-            if (index !== -1) return index;
-
-            const taxons = group.split(/\s+/);
-            for (let i = 0; i < orderedGroups.length; i++) {
-                const taxonsSorted = orderedGroups[i].split(/\s+/);
-                if (taxons.some(taxon => taxon !== 'and' && taxonsSorted.includes(taxon))) {
-                    index = i;
-                }
-            }
-
-            return index === -1 ? Number.MAX_SAFE_INTEGER : index;
-        };
-
-        const transformNameForSorting = (name: string): string => {
+        const transformNameForSorting = (
+            name: string
+        ): string => {
             if (!name) return '';
-            const parts = name.split(' ').reverse().join(', ');
-            return parts;
+
+            return name
+                .split(' ')
+                .reverse()
+                .join(', ');
         };
 
-        return Object.entries(birds).sort(([name1, speciesCode1], [name2, speciesCode2]) => {
-            const group1 = taxonomies[speciesCode1] || '';
-            const group2 = taxonomies[speciesCode2] || '';
+        return Object.entries(birds).sort(
+            ([name1, speciesCode1], [name2, speciesCode2]) => {
+                const group1 =
+                    taxonomies[speciesCode1] || '';
 
-            if (!group1) return 1;
-            if (!group2) return -1;
+                const group2 =
+                    taxonomies[speciesCode2] || '';
 
-            const index1 = findGroupIndex(group1);
-            const index2 = findGroupIndex(group2);
+                const index1 =
+                    orderedGroups.indexOf(group1);
 
-            if (index1 !== index2) {
-                return index1 - index2;
+                const index2 =
+                    orderedGroups.indexOf(group2);
+
+                if (index1 !== index2) {
+                    return index1 - index2;
+                }
+
+                return transformNameForSorting(
+                    name1
+                ).localeCompare(
+                    transformNameForSorting(name2)
+                );
             }
-
-            return transformNameForSorting(name1).localeCompare(transformNameForSorting(name2));
-        });
+        );
     };
 
-    const getUniqueGroups = (birds: Record<string, string>, taxonomies: Record<string, string>) => {
+    const getUniqueGroups = (
+        birds: Record<string, string>,
+        taxonomies: Record<string, string>
+    ) => {
         const groups = new Set<string>();
-        Object.entries(birds).forEach(([name, speciesCode]) => {
-            const group = taxonomies[speciesCode];
-            if (group) groups.add(group);
-        });
-        const sortedGroups = Array.from(groups).sort((a, b) => a.localeCompare(b));
+
+        Object.entries(birds).forEach(
+            ([name, speciesCode]) => {
+                const group = taxonomies[speciesCode];
+
+                if (group) {
+                    groups.add(group);
+                }
+            }
+        );
+
+        const sortedGroups = Array.from(groups).sort(
+            (a, b) => a.localeCompare(b)
+        );
+
         return ['All Groups', ...sortedGroups];
     };
 
-    const filterBirdsByGroup = (birds: [string, string][], group: string) => {
+    const filterBirdsByGroup = (
+        birds: [string, string][],
+        group: string
+    ) => {
         if (group === 'All Groups') return birds;
-        return birds.filter(([name, speciesCode]) => {
-            const birdGroup = taxonomies[speciesCode];
-            return birdGroup === group;
+
+        return birds.filter(
+            ([name, speciesCode]) =>
+                taxonomies[speciesCode] === group
+        );
+    };
+
+    const filterBirdsByKeywords = (
+        birds: [string, string][]
+    ): [string, string][] => {
+        if (selectedKeywords.size === 0) {
+            return birds;
+        }
+
+        return birds.filter(([name]) => {
+            const birdKeywordsList =
+                birdKeywords[name] || [];
+
+            return Array.from(
+                selectedKeywords
+            ).every(keyword =>
+                birdKeywordsList.includes(keyword)
+            );
         });
     };
 
-    const groupBirdsByTaxonomy = (birdList: [string, string][]) => {
-        const groups: Record<string, [string, string][]> = {};
+    const groupBirdsByTaxonomy = (
+        birdList: [string, string][]
+    ) => {
+        const groups: Record<
+            string,
+            [string, string][]
+        > = {};
 
         birdList.forEach(([name, speciesCode]) => {
-            const birdGroup = taxonomies[speciesCode] || 'Unknown';
+            const birdGroup =
+                taxonomies[speciesCode] || 'Unknown';
+
             if (!groups[birdGroup]) {
                 groups[birdGroup] = [];
             }
-            groups[birdGroup].push([name, speciesCode]);
+
+            groups[birdGroup].push([
+                name,
+                speciesCode
+            ]);
         });
 
         return groups;
     };
 
     const loadMore = () => {
-        if (!isLoading && page < Math.ceil(filteredBirds.length / batchSize) - 1) {
+        if (
+            !isLoading &&
+            page <
+                Math.ceil(
+                    filteredBirds.length / batchSize
+                ) -
+                    1
+        ) {
             setPage(prevPage => prevPage + 1);
         }
     };
-    
-    const filteredBirds = filterBirdsByGroup(orderedBirds, selectedGroup);
+
+    const filteredBirds = filterBirdsByKeywords(
+        filterBirdsByGroup(
+            orderedBirds,
+            selectedGroup
+        )
+    );
+
     const paginatedBirds =
         selectedGroup === 'All Groups'
-            ? orderedBirds.slice(0, (page + 1) * batchSize)
-            : orderedBirds.filter(([name, code]) => taxonomies[code] === selectedGroup);
+            ? filteredBirds.slice(
+                  0,
+                  (page + 1) * batchSize
+              )
+            : filteredBirds;
+
     const groupedBirds =
         selectedGroup === 'All Groups'
-            ? groupBirdsByTaxonomy(paginatedBirds)
-            : { [selectedGroup]: paginatedBirds };
-    const birdsToDisplay = 
-        sortMethod === 'default' 
-            ? Object.entries(groupedBirds) 
-            : [[selectedGroup, sortedBirds]];
+            ? groupBirdsByTaxonomy(
+                  paginatedBirds
+              )
+            : {
+                  [selectedGroup]:
+                      paginatedBirds
+              };
+
+    const filteredSortedBirds =
+        filterBirdsByKeywords(sortedBirds);
+
+    const birdsToDisplay =
+        sortMethod === 'default'
+            ? Object.entries(groupedBirds)
+            : [
+                  [
+                      selectedGroup,
+                      filteredSortedBirds
+                  ]
+              ];
 
     return (
         <div>
-        <select
-            value={selectedGroup}
-            onChange={(e) => {
-            const selected = e.target.value;
-            setSelectedGroup(selected);
-            setPage(0);
-            setSortMethod('default');
-            setSortedBirds(orderedBirds);
-            }}
-            style={{ marginBottom: '16px', padding: '8px' }}
-        >
-            {groups.map(group => (
-            <option key={group} value={group}>{group}</option>
-            ))}
-        </select>
-        {selectedGroup !== 'All Groups' && filteredBirds.length > 2 && (
-            <button
-                onClick={() => {
-                    if (!isProcessing) {
-                        setSortMethod(sortMethod === 'default' ? 'similarity' : 'default');
-                        if (sortMethod === 'default') {
-                            setSortedBirds([]);
-                            setIsProcessing(true);
-                        }
-                    }
+
+            <select
+                value={selectedGroup}
+                onChange={(e) => {
+                    const selected = e.target.value;
+
+                    setSelectedGroup(selected);
+                    setPage(0);
+                    setSortMethod('default');
+                    setSortedBirds(orderedBirds);
                 }}
-                disabled={isProcessing}
                 style={{
-                    padding: '8px 16px',
                     marginBottom: '16px',
-                    backgroundColor: isProcessing ? '#ccc' : '#f0f0f0',
-                    color: 'black',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: isProcessing ? 'not-allowed' : 'pointer'
+                    padding: '8px'
                 }}
             >
-                {isProcessing ? 'Processing...' : (sortMethod === 'default' ? 'Sort by Similarity' : 'Sort by Name')}
-            </button>
-        )}
-        {birdsToDisplay.map(([groupName, groupBirds]) => (
-            <div key={String(groupName)}>
-                {selectedGroup === 'All Groups' && (
-                    <h3 style={{ backgroundColor: '#f0f0f0', padding: '8px' }}>{groupName}</h3>
+                {groups.map(group => (
+                    <option
+                        key={group}
+                        value={group}
+                    >
+                        {group}
+                    </option>
+                ))}
+            </select>
+
+            {selectedGroup !== 'All Groups' &&
+                filteredBirds.length > 2 && (
+                    <button
+                        onClick={() => {
+                            if (!isProcessing) {
+                                setSortMethod(
+                                    sortMethod ===
+                                        'default'
+                                        ? 'similarity'
+                                        : 'default'
+                                );
+
+                                if (
+                                    sortMethod ===
+                                    'default'
+                                ) {
+                                    setSortedBirds([]);
+                                    setIsProcessing(true);
+                                }
+                            }
+                        }}
+                        disabled={isProcessing}
+                        style={{
+                            padding: '8px 16px',
+                            marginBottom: '16px',
+                            marginLeft: '8px',
+                            backgroundColor: isProcessing
+                                ? '#ccc'
+                                : '#f0f0f0',
+                            color: 'black',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: isProcessing
+                                ? 'not-allowed'
+                                : 'pointer'
+                        }}
+                    >
+                        {isProcessing
+                            ? 'Processing...'
+                            : sortMethod ===
+                              'default'
+                            ? 'Sort by Similarity'
+                            : 'Sort by Name'}
+                    </button>
                 )}
 
-                <div className="bird-grid">
-                    {Array.isArray(groupBirds) && groupBirds.map(([name, speciesCode]) => (
-                        <div className="bird-card" key={name}>
-                            {birdImages[name] && (
-                                <img
-                                    src={birdImages[name]}
-                                    alt={name}
-                                    className="bird-image"
-                                    loading="lazy"
-                                    decoding="async"
-                                />
+            {selectedGroup !== 'All Groups' && (
+                <>
+                    <button
+                        onClick={() => setFiltersOpen(prev => !prev)}
+                        style={{
+                            padding: '8px 16px',
+                            marginBottom: '16px',
+                            backgroundColor: filtersOpen ? '#e0e0e0' : '#f0f0f0',
+                            color: '#000',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px'
+                        }}
+                    >
+                        <span style={{ fontWeight: filtersOpen ? 600 : 400 }}>
+                            Filters
+                        </span>
+
+                        <span
+                            style={{
+                                display: 'inline-block',
+                                fontSize: '0.8rem',
+                                transform: filtersOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.2s ease'
+                            }}
+                        >
+                            ▶
+                        </span>
+                    </button>
+
+                    {filtersOpen && (
+                        <div
+                            style={{
+                                marginBottom: '16px',
+                                border: '1px solid #e0e0e0',
+                                borderRadius: '4px',
+                                backgroundColor: '#f9f9f9',
+                                padding: '12px'
+                            }}
+                        >
+                            {isLoadingKeywords && (
+                                <div style={{ fontSize: '0.8rem', color: '#666' }}>
+                                    Loading filters...
+                                </div>
                             )}
-                            <span
-                                onClick={() => router.push(`/?species=${speciesCode}`)}
-                                style={{ cursor: 'pointer' }}
-                            >
-                                {name}
-                            </span>
+
+                            {!isLoadingKeywords &&
+                                Object.keys(keywordsByCategory).length > 0 &&
+                                Object.entries(keywordsByCategory)
+                                    .sort(([a], [b]) => a.localeCompare(b))
+                                    .map(([category, keywords]) => (
+                                        <div key={category} style={{ marginBottom: '12px' }}>
+                                            <strong style={{ fontSize: '0.78rem', color: '#555' }}>
+                                                {category}
+                                            </strong>
+
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    flexWrap: 'wrap',
+                                                    gap: '6px',
+                                                    marginTop: '6px'
+                                                }}
+                                            >
+                                                {Array.from(keywords).sort().map(keyword => {
+                                                    const keywordId = `${category}:${keyword}`;
+                                                    const isSelected = selectedKeywords.has(keywordId);
+
+                                                    return (
+                                                        <span
+                                                            key={keyword}
+                                                            onClick={() => {
+                                                                const next = new Set(selectedKeywords);
+                                                                isSelected
+                                                                    ? next.delete(keywordId)
+                                                                    : next.add(keywordId);
+                                                                setSelectedKeywords(next);
+                                                            }}
+                                                            style={{
+                                                                fontSize: '0.75rem',
+                                                                padding: '3px 8px',
+                                                                borderRadius: '3px',
+                                                                cursor: 'pointer',
+                                                                backgroundColor: isSelected ? '#0277bd' : '#e8f4f8',
+                                                                color: isSelected ? '#fff' : '#0277bd',
+                                                                border: '1px solid #b3e5fc'
+                                                            }}
+                                                        >
+                                                            {keyword}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
                         </div>
-                    ))}
-                </div>
-            </div>
-        ))}
+                    )}
+                </>
+            )}
 
-        {isLoading && <p>Loading...</p>}
-        {selectedGroup === 'All Groups' && (
-            <button
-            onClick={loadMore}
-            disabled={isLoading || (page + 1) * batchSize >= filteredBirds.length}
-            >
-            Load More
-            </button>
-        )}
+            {birdsToDisplay.map(
+                ([groupName, groupBirds]) => (
+                    <div
+                        key={String(groupName)}
+                    >
+                        {selectedGroup ===
+                            'All Groups' && (
+                            <h3
+                                style={{
+                                    backgroundColor:
+                                        '#f0f0f0',
+                                    padding: '8px'
+                                }}
+                            >
+                                {groupName}
+                            </h3>
+                        )}
 
-        {isLoading && sortMethod === 'similarity' && (
-            <div style={{ padding: '16px', textAlign: 'center' }}>
-                Loading image similarity model...
-            </div>
-        )}
+                        <div className="bird-grid">
+                            {Array.isArray(
+                                groupBirds
+                            ) &&
+                                groupBirds.map(
+                                    ([
+                                        name,
+                                        speciesCode
+                                    ]) => (
+                                        <div
+                                            className="bird-card"
+                                            key={
+                                                name
+                                            }
+                                        >
+                                            {birdImages[
+                                                name
+                                            ] && (
+                                                <img
+                                                    src={
+                                                        birdImages[
+                                                            name
+                                                        ]
+                                                    }
+                                                    alt={
+                                                        name
+                                                    }
+                                                    className="bird-image"
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                />
+                                            )}
 
+                                            <span
+                                                onClick={() =>
+                                                    router.push(
+                                                        `/?species=${speciesCode}`
+                                                    )
+                                                }
+                                                style={{
+                                                    cursor:
+                                                        'pointer'
+                                                }}
+                                            >
+                                                {
+                                                    name
+                                                }
+                                            </span>
+                                        </div>
+                                    )
+                                )}
+                        </div>
+                    </div>
+                )
+            )}
+
+            {isLoading && <p>Loading...</p>}
+
+            {selectedGroup ===
+                'All Groups' && (
+                <button
+                    onClick={loadMore}
+                    disabled={
+                        isLoading ||
+                        (page + 1) *
+                            batchSize >=
+                            filteredBirds.length
+                    }
+                >
+                    Load More
+                </button>
+            )}
+
+            <style jsx>{`
+                details summary::-webkit-details-marker {
+                    display: none;
+                }
+
+                details summary {
+                    list-style: none;
+                }
+            `}</style>
         </div>
     );
 };
