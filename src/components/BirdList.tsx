@@ -463,11 +463,11 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                 value={selectedGroup}
                 onChange={(e) => {
                     const selected = e.target.value;
-
                     setSelectedGroup(selected);
                     setPage(0);
                     setSortMethod('default');
                     setSortedBirds(orderedBirds);
+                    setFiltersOpen(false);
                 }}
                 style={{
                     marginBottom: '16px',
@@ -530,7 +530,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                     </button>
                 )}
 
-            {selectedGroup !== 'All Groups' && (
+            {selectedGroup !== 'All Groups' && Object.keys(keywordsByCategory).length > 0 && (
                 <>
                     <button
                         onClick={() => setFiltersOpen(prev => !prev)}
@@ -611,6 +611,9 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                                                     ? next.delete(keywordId)
                                                                     : next.add(keywordId);
                                                                 setSelectedKeywords(next);
+
+                                                                setSortMethod('default');
+                                                                setSortedBirds(orderedBirds);
                                                             }}
                                                             style={{
                                                                 fontSize: '0.75rem',
