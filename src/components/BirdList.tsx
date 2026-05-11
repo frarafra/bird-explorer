@@ -307,6 +307,9 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                 const group2 =
                     taxonomies[speciesCode2] || '';
 
+                if (!group1) return 1;
+                if (!group2) return -1;
+
                 const index1 =
                     orderedGroups.indexOf(group1);
 
@@ -484,104 +487,86 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                 ))}
             </select>
 
-            {selectedGroup !== 'All Groups' &&
-                filteredBirds.length > 2 && (
-                    <button
-                        onClick={() => {
-                            if (!isProcessing) {
-                                setSortMethod(
-                                    sortMethod ===
-                                        'default'
-                                        ? 'similarity'
-                                        : 'default'
-                                );
-
-                                if (
-                                    sortMethod ===
-                                    'default'
-                                ) {
-                                    setSortedBirds([]);
-                                    setIsProcessing(true);
-                                }
-                            }
-                        }}
-                        disabled={isProcessing}
-                        style={{
-                            padding: '8px 16px',
-                            marginBottom: '16px',
-                            marginLeft: '8px',
-                            backgroundColor: isProcessing
-                                ? '#ccc'
-                                : '#f0f0f0',
-                            color: 'black',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: isProcessing
-                                ? 'not-allowed'
-                                : 'pointer'
-                        }}
-                    >
-                        {isProcessing
-                            ? 'Processing...'
-                            : sortMethod ===
-                              'default'
-                            ? 'Sort by Similarity'
-                            : 'Sort by Name'}
-                    </button>
-                )}
-
-            {selectedGroup !== 'All Groups' && Object.keys(keywordsByCategory).length > 0 && (
+            {selectedGroup !== 'All Groups' && (
                 <>
-                    <button
-                        onClick={() => setFiltersOpen(prev => !prev)}
-                        style={{
-                            padding: '8px 16px',
+                    <div style={{
+                        display: 'flex',
+                        gap: '8px',
+                        flexWrap: 'wrap',
+                        marginBottom: '16px',
+                        justifyContent: 'flex-start'
+                    }}>
+                        {Object.keys(keywordsByCategory).length > 0 && (
+                            <button
+                                onClick={() => setFiltersOpen(prev => !prev)}
+                                style={{
+                                    padding: '8px 16px',
+                                    backgroundColor: filtersOpen ? '#e0e0e0' : '#f0f0f0',
+                                    color: '#000',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '8px'
+                                }}
+                            >
+                                <span style={{ fontWeight: filtersOpen ? 600 : 400 }}>
+                                    Filters
+                                </span>
+                                <span style={{
+                                    display: 'inline-block',
+                                    fontSize: '0.8rem',
+                                    transform: filtersOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                                    transition: 'transform 0.2s ease'
+                                }}>
+                                    ▶
+                                </span>
+                            </button>
+                        )}
+
+                        {filteredBirds.length > 2 && (
+                            <button
+                                onClick={() => {
+                                    if (!isProcessing) {
+                                        setSortMethod(
+                                            sortMethod === 'default' ? 'similarity' : 'default'
+                                        );
+                                        if (sortMethod === 'default') {
+                                            setSortedBirds([]);
+                                            setIsProcessing(true);
+                                        }
+                                    }
+                                }}
+                                disabled={isProcessing}
+                                style={{
+                                    padding: '8px 16px',
+                                    backgroundColor: isProcessing ? '#ccc' : '#f0f0f0',
+                                    color: 'black',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                {isProcessing ? 'Processing...' : sortMethod === 'default' ? 'Sort by Similarity' : 'Sort by Name'}
+                            </button>
+                        )}
+                    </div>
+
+                    {Object.keys(keywordsByCategory).length > 0 && filtersOpen && (
+                        <div style={{
                             marginBottom: '16px',
-                            backgroundColor: filtersOpen ? '#e0e0e0' : '#f0f0f0',
-                            color: '#000',
-                            border: 'none',
+                            border: '1px solid #e0e0e0',
                             borderRadius: '4px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '8px'
-                        }}
-                    >
-                        <span style={{ fontWeight: filtersOpen ? 600 : 400 }}>
-                            Filters
-                        </span>
-
-                        <span
-                            style={{
-                                display: 'inline-block',
-                                fontSize: '0.8rem',
-                                transform: filtersOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-                                transition: 'transform 0.2s ease'
-                            }}
-                        >
-                            ▶
-                        </span>
-                    </button>
-
-                    {filtersOpen && (
-                        <div
-                            style={{
-                                marginBottom: '16px',
-                                border: '1px solid #e0e0e0',
-                                borderRadius: '4px',
-                                backgroundColor: '#f9f9f9',
-                                padding: '12px'
-                            }}
-                        >
-                            {isLoadingKeywords && (
+                            backgroundColor: '#f9f9f9',
+                            padding: '12px'
+                        }}>
+                            {isLoadingKeywords ? (
                                 <div style={{ fontSize: '0.8rem', color: '#666' }}>
                                     Loading filters...
                                 </div>
-                            )}
-
-                            {!isLoadingKeywords &&
-                                Object.keys(keywordsByCategory).length > 0 &&
+                            ) : (
                                 Object.entries(keywordsByCategory)
                                     .sort(([a], [b]) => a.localeCompare(b))
                                     .map(([category, keywords]) => (
@@ -589,19 +574,15 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                             <strong style={{ fontSize: '0.78rem', color: '#555' }}>
                                                 {category}
                                             </strong>
-
-                                            <div
-                                                style={{
-                                                    display: 'flex',
-                                                    flexWrap: 'wrap',
-                                                    gap: '6px',
-                                                    marginTop: '6px'
-                                                }}
-                                            >
+                                            <div style={{
+                                                display: 'flex',
+                                                flexWrap: 'wrap',
+                                                gap: '6px',
+                                                marginTop: '6px'
+                                            }}>
                                                 {Array.from(keywords).sort().map(keyword => {
                                                     const keywordId = `${category}:${keyword}`;
                                                     const isSelected = selectedKeywords.has(keywordId);
-
                                                     return (
                                                         <span
                                                             key={keyword}
@@ -611,7 +592,6 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                                                     ? next.delete(keywordId)
                                                                     : next.add(keywordId);
                                                                 setSelectedKeywords(next);
-
                                                                 setSortMethod('default');
                                                                 setSortedBirds(orderedBirds);
                                                             }}
@@ -631,7 +611,8 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                                 })}
                                             </div>
                                         </div>
-                                    ))}
+                                    ))
+                            )}
                         </div>
                     )}
                 </>
