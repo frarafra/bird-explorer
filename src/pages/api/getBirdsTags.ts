@@ -17,8 +17,6 @@ const docClient = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = 'ebird_taxonomy';
 const BATCH_SIZE = 100;
 
-// --- Helpers ---
-
 const capitalizeName = (name: string): string =>
     name.split(' ')
         .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
@@ -42,8 +40,6 @@ const chunkArray = <T,>(arr: T[], size: number): T[][] =>
     Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
         arr.slice(i * size, i * size + size)
     );
-
-// --- Keyword Cleaning ---
 
 const isBiologicalNoise = (k: string) => {
     const biologicalNoisePattern = process.env.NEXT_PUBLIC_BIOLOGICAL_NOISE_PATTERN;
@@ -109,8 +105,6 @@ const normalizeKeywordsMap = (map: Record<string, string[]>) => {
     return out;
 };
 
-// --- DynamoDB ---
-
 const batchGetItems = async (names: string[]): Promise<BirdData[]> => {
     const command = new BatchGetCommand({
         RequestItems: {
@@ -127,22 +121,31 @@ const batchGetItems = async (names: string[]): Promise<BirdData[]> => {
 const batchGetItemsParallel = async (names: string[]) =>
     (await Promise.all(chunkArray(names, BATCH_SIZE).map(batchGetItems))).flat();
 
-// --- Mapping ---
+const normalizeForSynonym = (text: string): string => {
+    let t = text.toLowerCase().trim();
+    t = t.replace(/^(its|the|a|an|their)\s+/i, '');
+    t = t.replace(/(\w+)ies\b/g, '$1y');
+    t = t.replace(/(\w+)s\b/g, '$1');
+    return t;
+};
 
 const createRawToNormalizedMapping = (birds: BirdData[], map: Record<string, string[]>) => {
-    const out: Record<string, Record<string, string>> = {};
+    const out: Record<string, Record<string, string[]>> = {};
 
     for (const [cat, keywords] of Object.entries(map)) {
         out[cat] = {};
 
         for (const kw of keywords) {
             const rawKey = `_keywords_${cat.toLowerCase().replace(/\s+/g, '_')}`;
+            const normKw = normalizeForSynonym(kw);
 
             for (const bird of birds) {
                 for (const raw of safeArray(bird[rawKey])) {
-                    const norm = extractKeywordFromPhrase(raw.toLowerCase()) || raw.toLowerCase();
-                    if (norm === kw || raw.toLowerCase().includes(kw)) {
-                        out[cat][kw] = raw;
+                    const normRaw = normalizeForSynonym(raw);
+
+                    if (normRaw === normKw) {
+                        if (!out[cat][kw]) out[cat][kw] = [];
+                        if (!out[cat][kw].includes(raw)) out[cat][kw].push(raw);
                     }
                 }
             }
@@ -156,7 +159,7 @@ const mapBirdsToNormalizedKeywords = (
     names: string[],
     birds: BirdData[],
     map: Record<string, string[]>,
-    mapping: Record<string, Record<string, string>>
+    mapping: Record<string, Record<string, string[]>>
 ) => {
     const out: Record<string, string[]> = {};
     const nameMap: Record<string, string> = {};
@@ -171,8 +174,9 @@ const mapBirdsToNormalizedKeywords = (
             const rawList = safeArray(bird[rawKey]);
 
             for (const kw of kws) {
-                const raw = mapping[cat]?.[kw];
-                if (raw && rawList.includes(raw)) {
+                const rawArr = mapping[cat]?.[kw] || [];
+
+                if (rawArr.some(raw => rawList.includes(raw))) {
                     keywords.push(`${cat}:${kw}`);
                 }
             }
@@ -183,63 +187,6 @@ const mapBirdsToNormalizedKeywords = (
 
     return out;
 };
-
-// --- Hybrid Semantic Deduplication ---
-
-/*const normalizeText = (text: string): string => {
-    let t = text.toLowerCase().trim();
-
-    return t
-        .replace(/(\w+)ies\b/g, '$1y')
-        .replace(/(\w+)s\b/g, '$1');
-};
-
-const tokenize = (text: string) =>
-    normalizeText(text).split(/[\s-]+/).filter(Boolean);
-
-const vectorize = (tokens: string[]) => {
-    const map: Record<string, number> = {};
-    tokens.forEach(t => map[t] = (map[t] || 0) + 1);
-    Object.keys(map).forEach(k => map[k] = 1 + Math.log(map[k]));
-    return map;
-};
-
-const cosineSim = (a: Record<string, number>, b: Record<string, number>) => {
-    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-    let dot = 0, magA = 0, magB = 0;
-
-    keys.forEach(k => {
-        const va = a[k] || 0;
-        const vb = b[k] || 0;
-        dot += va * vb;
-        magA += va * va;
-        magB += vb * vb;
-    });
-
-    if (!magA || !magB) return 0;
-    return dot / (Math.sqrt(magA) * Math.sqrt(magB));
-};
-
-const deduplicateKeywords = (keywords: string[], threshold = 0.75) => {
-    const clean = keywords.filter(k => typeof k === 'string');
-    const normalized = clean.map(normalizeText);
-    const vectors = normalized.map(k => vectorize(tokenize(k)));
-
-    const kept: number[] = [];
-
-    for (let i = 0; i < clean.length; i++) {
-        const duplicate = kept.some(j =>
-            normalized[i] === normalized[j] ||
-            cosineSim(vectors[i], vectors[j]) >= threshold
-        );
-
-        if (!duplicate) kept.push(i);
-    }
-
-    return kept.map(i => clean[i]);
-};*/
-
-// --- NEW: Filter shared keywords (>= 2 birds) ---
 
 function filterSharedKeywords(
     birdKeywords: Record<string, string[]>,
@@ -274,8 +221,6 @@ function filterSharedKeywords(
         allowedKeywords: allowed,
     };
 }
-
-// --- Handler ---
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse<ResponseData>) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
