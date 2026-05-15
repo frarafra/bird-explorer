@@ -3,6 +3,7 @@ import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { getRedisClient } from '../../client/redis';
 
 const redis = getRedisClient();
+const lambdaClient = new LambdaClient({ region: "eu-west-1" });
 
 async function extractFeatures(birds: [string, string][], birdImages: Record<string, string>) {
   const payload = {
@@ -14,8 +15,7 @@ async function extractFeatures(birds: [string, string][], birdImages: Record<str
     Payload: Buffer.from(JSON.stringify(payload)),
   });
 
-  const client = new LambdaClient({ region: "eu-west-1" });
-  const response = await client.send(command);
+  const response = await lambdaClient.send(command);
   const lambdaResult = JSON.parse(
     new TextDecoder().decode(response.Payload)
   );
