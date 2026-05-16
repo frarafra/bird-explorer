@@ -100,7 +100,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const featuresMap = await extractFeatures(birds, birdImages);
     const result = await clusterFeatures(birds, birdImages, featuresMap);
 
-    await redis.set(cacheKey, JSON.stringify(result), 'EX', 15 * 60);
+    await redis.set(cacheKey, JSON.stringify(result), 'EX', 10 * 60);
 
     res.status(200).json(result);
 
