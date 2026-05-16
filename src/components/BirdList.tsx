@@ -60,7 +60,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                 const results = await fetch('/api/ebirdSimilarImages', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ birds: [], birdImages: {} }),
+                    body: JSON.stringify({ birds: ['ou'], birdImages: { 'ou': process.env.NEXT_PUBLIC_EBIRD_IMAGE_URL } }),
                 });
 
                 if (!results.ok) {
