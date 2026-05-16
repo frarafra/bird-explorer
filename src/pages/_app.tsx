@@ -7,22 +7,11 @@ function MyApp({ Component, pageProps }: AppProps) {
     useEffect(() => {
         const warmUpLambda = async () => {
             try {
-                const results = await Promise.allSettled([
-                    fetch(`/api/ebirdTaxonFind?bird=ou`),
-                    fetch('/api/ebirdSimilarImages', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ birds: ['ou'], birdImages: { 'ou': process.env.NEXT_PUBLIC_EBIRD_IMAGE_URL } }),
-                    }),
-                ]);
+                const results = await fetch(`/api/ebirdTaxonFind?bird=ou`);
 
-                results.forEach((result, index) => {
-                    if (result.status === 'rejected') {
-                        console.error(`Request ${index + 1} failed:`, result.reason);
-                    } else if (!result.value.ok) {
-                        console.error(`Request ${index + 1} failed with status:`, result.value.status, result.value.statusText);
-                    }
-                });
+                if (!results.ok) {
+                    console.error(`Request failed with status:`, results.status, results.statusText);
+                }
             } catch (error) {
                 console.error('Unexpected error during warm-up:', error);
             }
