@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "3.490.0",
-    "@aws-sdk/client-lambda": "3.1022.0",
     "@aws-sdk/lib-dynamodb": "3.1032.0",
     "axios": "1.13.2",
     "axios-cookiejar-support": "6.0.4",
