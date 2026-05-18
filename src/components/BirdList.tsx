@@ -55,26 +55,6 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     const router = useRouter();
 
     useEffect(() => {
-        const warmUpLambda = async () => {
-            try {
-                const results = await fetch('/api/ebirdSimilarImages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ birds: ['ou'], birdImages: { 'ou': process.env.NEXT_PUBLIC_EBIRD_IMAGE_URL } }),
-                });
-
-                if (!results.ok) {
-                    console.error(`Request failed with status:`, results.status, results.statusText);
-                }
-            } catch (error) {
-                console.error('Unexpected error during warm-up:', error);
-            }
-        };
-
-        warmUpLambda();
-    }, []);
-
-    useEffect(() => {
         if (selectedKeywords.size > 0) {
             setFiltersOpen(true);
         }
