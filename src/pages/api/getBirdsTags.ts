@@ -273,7 +273,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
         res.setHeader('Cache-Control', 'private, max-age=3600');
         return res.status(200).json({
-            birds,
             keywordsMap: filteredKeywordsMap,
             birdKeywords: filteredBirdKeywords,
         });

@@ -1,5 +1,6 @@
 import React, { FC, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useQuery } from '@tanstack/react-query'
 import { BirdContext } from '../contexts/BirdContext';
 import { fetchBirdsFilters } from '../utils/birdTaxonomyClient';
 
@@ -24,7 +25,6 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     } = useContext(BirdContext);
 
     const [orderedBirds, setOrderedBirds] = useState<[string, string][]>([]);
-    const [isLoading, setIsLoading] = useState(false);
     const [groups, setGroups] = useState<string[]>([]);
 
     const [sortMethod, setSortMethod] = useState<'default' | 'similarity'>(
@@ -74,6 +74,51 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         warmUpLambda();
     }, []);
 
+    const { data: imagesData, isLoading: isLoadingImages } = useQuery({
+        queryKey: [
+            'birdImages',
+            selectedGroup,
+            page,
+            orderedBirds.length,
+        ],
+        queryFn: async () => {
+            const filtered = filterBirdsByGroup(orderedBirds, selectedGroup);
+            if (filtered.length === 0) {
+                setSelectedGroup('All Groups');
+                return {};
+            }
+
+            let batch: Record<string, string>;
+            if (selectedGroup === 'All Groups') {
+                const start = page * batchSize;
+                const end = (page + 1) * batchSize;
+                batch = filtered.slice(start, end).reduce((acc, [name, code]) => {
+                    acc[name] = code;
+                    return acc;
+                }, {} as Record<string, string>);
+            } else {
+                batch = filtered.reduce((acc, [name, code]) => {
+                    acc[name] = code;
+                    return acc;
+                }, {} as Record<string, string>);
+            }
+
+            if (Object.keys(batch).length === 0) return {};
+
+            const response = await fetch('/api/ebirdImages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(batch),
+            });
+
+            if (!response.ok) throw new Error('Failed to fetch images');
+            
+            return response.json();
+        },
+        enabled: orderedBirds.length > 0,
+        staleTime: 1000 * 60 * 5,
+    });
+
     useEffect(() => {
         if (selectedKeywords.size > 0) {
             setFiltersOpen(true);
@@ -111,51 +156,16 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     }, [birds, taxonomies]);
 
     useEffect(() => {
-        if (orderedBirds.length === 0) return;
-
-        const filtered = filterBirdsByGroup(
-            orderedBirds,
-            selectedGroup
-        );
-
-        if (filtered.length === 0) {
-            setSelectedGroup('All Groups');
+        if (imagesData) {
+            setBirdImages(prev => ({
+            ...prev,
+            ...imagesData.reduce((acc: Record<string, string>, bird: BirdData) => {
+                acc[bird.name] = bird.imageUrl;
+                return acc;
+            }, {})
+            }));
         }
-
-        if (selectedGroup === 'All Groups') {
-            const start = page * batchSize;
-            const end = (page + 1) * batchSize;
-
-            const currentBatch = filtered
-                .slice(start, end)
-                .reduce((acc: Record<string, string>, [name, code]) => {
-                    acc[name] = code;
-                    return acc;
-                }, {});
-
-            if (Object.keys(currentBatch).length > 0) {
-                setIsLoading(true);
-
-                fetchBatchImages(currentBatch).finally(() =>
-                    setIsLoading(false)
-                );
-            }
-        } else {
-            const allBirdsInGroup = filtered.reduce(
-                (acc: Record<string, string>, [name, code]) => {
-                    acc[name] = code;
-                    return acc;
-                },
-                {}
-            );
-
-            setIsLoading(true);
-
-            fetchBatchImages(allBirdsInGroup).finally(() =>
-                setIsLoading(false)
-            );
-        }
-    }, [orderedBirds, selectedGroup, page]);
+    }, [imagesData, setBirdImages]);
 
     useEffect(() => {
         const clusterBirds = async (
@@ -267,43 +277,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         fetchAndProcessKeywords();
     }, [selectedGroup, orderedBirds, taxonomies]);
 
-    const fetchBatchImages = async (
-        batch: Record<string, string>
-    ) => {
-        try {
-            const response = await fetch('/api/ebirdImages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(batch)
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch images');
-            }
-
-            const data = await response.json();
-
-            setBirdImages(prev => ({
-                ...prev,
-                ...data.reduce(
-                    (
-                        acc: Record<string, string>,
-                        bird: BirdData
-                    ) => {
-                        acc[bird.name] = bird.imageUrl;
-                        return acc;
-                    },
-                    {}
-                )
-            }));
-        } catch (error) {
-            console.error('Error fetching images:', error);
-        }
-    };
-
-    const sortBirdsByTaxonomy = (
+     const sortBirdsByTaxonomy = (
         birds: Record<string, string>,
         taxonomies: Record<string, string>,
         orderedGroups: string[]
@@ -430,7 +404,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
 
     const loadMore = () => {
         if (
-            !isLoading &&
+            !isLoadingImages &&
             page <
                 Math.ceil(
                     filteredBirds.length / batchSize
@@ -712,14 +686,14 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                 )
             )}
 
-            {isLoading && <p>Loading...</p>}
+            {isLoadingImages && <p>Loading...</p>}
 
             {selectedGroup ===
                 'All Groups' && (
                 <button
                     onClick={loadMore}
                     disabled={
-                        isLoading ||
+                        isLoadingImages ||
                         (page + 1) *
                             batchSize >=
                             filteredBirds.length

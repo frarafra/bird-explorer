@@ -1,7 +1,10 @@
 import React, { useEffect } from 'react';
 import type { AppProps } from 'next/app';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BirdProvider } from '../contexts/BirdContext';
 import '../styles/globals.css';
+
+const queryClient = new QueryClient();
 
 function MyApp({ Component, pageProps }: AppProps) {
     useEffect(() => {
@@ -21,9 +24,11 @@ function MyApp({ Component, pageProps }: AppProps) {
     }, []);
 
     return (
-        <BirdProvider>
-            <Component {...pageProps} />
-        </BirdProvider>
+        <QueryClientProvider client={queryClient}>
+            <BirdProvider>
+                <Component {...pageProps} />
+            </BirdProvider>
+        </QueryClientProvider>
     );
 }
 
