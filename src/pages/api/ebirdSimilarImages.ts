@@ -3,91 +3,68 @@ import { getRedisClient } from '../../client/redis';
 
 const redis = getRedisClient();
 
-async function extractFeatures(birds: [string, string][], birdImages: Record<string, string>) {
-  const lambdaUrl = process.env.NEXT_PUBLIC_AWS_EBIRD_EXTRACT_FEATURES_ENDPOINT;
-  if (!lambdaUrl) {
-    throw new Error('Extract Features endpoint is not defined');
-  }
-
-  const payload = { birds, birdImages };
-
-  const response = await fetch(lambdaUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Lambda call failed: ${errorText}`);
-  }
-
-  const lambdaResult = await response.json();
-
-  const featuresMap: Record<string, number[]> =
-    typeof lambdaResult.body === 'string' ? JSON.parse(lambdaResult.body) : lambdaResult;
-
-  return featuresMap;
-}
-
 async function clusterFeatures(
   birds: [string, string][],
-  birdImages: Record<string, string>,
-  featuresMap: Record<string, number[]>
+  birdImages: Record<string, string>
 ) {
-  const birdNameCodeForLambda: [string, string][] = [];
-  const birdCodeImageUrlForLambda: [string, string][] = [];
-
-  birds.forEach(([name, code]) => {
-    const lowerName = name.trim().toLowerCase();
-    if (featuresMap[lowerName]) {
-      birdNameCodeForLambda.push([lowerName, code]);
-      birdCodeImageUrlForLambda.push([code, birdImages[name]]);
-    }
-  });
-
   const endpoint = process.env.NEXT_PUBLIC_AWS_EBIRD_CLUSTERING_ENDPOINT;
+
   if (!endpoint) {
     throw new Error('Clustering endpoint is not defined');
   }
 
-  const lambdaResponse = await fetch(endpoint, {
+  const bird_name_code: [string, string][] = [];
+  const bird_code_image_url: [string, string][] = [];
+
+  for (const [name, code] of birds) {
+    bird_name_code.push([name, code]);
+
+    bird_code_image_url.push([
+      code,
+      birdImages[name] || ''
+    ]);
+  }
+
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      bird_name_code: birdNameCodeForLambda,
-      bird_code_image_url: birdCodeImageUrlForLambda,
-      features_map: featuresMap,
+      bird_name_code,
+      bird_code_image_url,
+      threshold: 25
     }),
   });
 
-  if (!lambdaResponse.ok) {
-    const errorText = await lambdaResponse.text();
-    throw new Error(`Lambda failed: ${errorText}`);
+  if (!response.ok) {
+    throw new Error(`Clustering Lambda failed: ${await response.text()}`);
   }
 
-  const rawData = await lambdaResponse.json();
+  const raw = await response.json();
+
   const groupedResults =
-    typeof rawData.body === 'string' ? JSON.parse(rawData.body) : rawData;
+    typeof raw.body === 'string' ? JSON.parse(raw.body) : raw;
 
   const finalSortedBirds: [string, string][] = [];
-  const processedCodes = new Set<string>();
+  const processed = new Set<string>();
+
   const groupKeys = Object.keys(groupedResults).sort();
 
-  groupKeys.forEach((key) => {
+  for (const key of groupKeys) {
     const group = groupedResults[key];
-    if (Array.isArray(group)) {
-      group.forEach((bird: { name: string; code: string }) => {
-        if (!processedCodes.has(bird.code)) {
-          finalSortedBirds.push([bird.name, bird.code]);
-          processedCodes.add(bird.code);
-        }
-      });
-    }
-  });
 
-  const missingBirds = birds.filter(([, code]) => !processedCodes.has(code));
-  return [...finalSortedBirds, ...missingBirds];
+    if (Array.isArray(group)) {
+      for (const bird of group) {
+        if (!processed.has(bird.code)) {
+          finalSortedBirds.push([bird.name, bird.code]);
+          processed.add(bird.code);
+        }
+      }
+    }
+  }
+
+  const missing = birds.filter(([, code]) => !processed.has(code));
+
+  return [...finalSortedBirds, ...missing];
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -98,20 +75,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const birdImages = req.body.birdImages as Record<string, string>;
 
     const cacheKey = `clusters-${JSON.stringify(birds)}`;
-    const cachedResult = await redis.get(cacheKey);
-    if (cachedResult) {
-      res.status(200).json(JSON.parse(cachedResult));
-      return;
+
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.status(200).json(JSON.parse(cached));
     }
 
-    const featuresMap = await extractFeatures(birds, birdImages);
-    const result = await clusterFeatures(birds, birdImages, featuresMap);
+    const result = await clusterFeatures(birds, birdImages);
 
-    await redis.set(cacheKey, JSON.stringify(result), 'EX', 10 * 60);
+    await redis.set(cacheKey, JSON.stringify(result), 'EX', 600);
 
-    res.status(200).json(result);
+    return res.status(200).json(result);
   } catch (error: any) {
     console.error('Clustering Pipeline Error:', error);
-    res.status(500).json({ error: error.message });
+
+    return res.status(500).json({ error: error.message });
   }
 }
