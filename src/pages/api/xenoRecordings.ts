@@ -98,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await Promise.all(
             queries.map(async (q: { name: string, code: string, lat?: number, lon?: number }) => {
                 try {
-                    const xr = await fetchXenoRecordings(q.name, q.code, q.lat, q.lon, 1);
+                    const xr = await fetchXenoRecordings(q.name, q.code, q.lat ?? 0, q.lon ?? 0, 1);
                     const recs = Array.isArray(xr) ? xr : [];
                     out[q.name] = recs;
                 } catch (e) {
