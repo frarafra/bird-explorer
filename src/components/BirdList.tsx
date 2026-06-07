@@ -688,19 +688,16 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
 
             {isLoadingImages && <p>Loading...</p>}
 
-            {selectedGroup ===
-                'All Groups' && (
-                <button
-                    onClick={loadMore}
-                    disabled={
-                        isLoadingImages ||
-                        (page + 1) *
-                            batchSize >=
-                            filteredBirds.length
-                    }
-                >
-                    Load More
-                </button>
+            {selectedGroup === 'All Groups' && filteredBirds.length > (page + 1) * batchSize && (
+                <div style={{ textAlign: 'center', marginTop: 12 }}>
+                    <button
+                        onClick={loadMore}
+                        disabled={isLoadingImages || (page + 1) * batchSize >= filteredBirds.length}
+                        style={{ padding: '8px 16px', cursor: isLoadingImages ? 'not-allowed' : 'pointer' }}
+                    >
+                        {isLoadingImages ? 'Loading…' : 'Load More'}
+                    </button>
+                </div>
             )}
 
             <style jsx>{`

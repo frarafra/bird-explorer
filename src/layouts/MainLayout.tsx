@@ -12,7 +12,8 @@ const MainLayout: FC<MainLayoutProps> = ({ children, shareButton }) => (
             <nav style={{ flex: 1, textAlign: 'left' }}>
                 <ul style={{ listStyleType: 'none', display: 'flex', gap: '2rem' }}>
                     <li><Link href="/">Search</Link></li>
-                    <li><Link href="/birds">Bird List</Link></li>
+                    <li><Link href="/birds">Birds</Link></li>
+                    <li><Link href="/songbook">Songbook</Link></li>
                 </ul>
             </nav>
             {shareButton && <div className="share-button">{shareButton}</div>}
