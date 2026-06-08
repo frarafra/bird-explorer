@@ -38,7 +38,7 @@ const SongbookPage: React.FC = () => {
                 const res = await fetch('/api/getBirdsTags', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ commonNames: birdNames })
+                    body: JSON.stringify({ commonNames: birdNames, cache: true })
                 });
 
                 if (!res.ok) throw new Error(`Failed to fetch bird tags: ${res.status}`);
@@ -202,6 +202,7 @@ const SongbookPage: React.FC = () => {
 
                     const anyAvailable = visibleNames.some(n => recordNames.includes(n));
                     if (!anyAvailable) {
+                        if (loading) return null;
                         return <div style={{ color: '#666' }}>{selectedSpecies && selectedSpecies !== 'All Species' ? 'No recordings match the selected species.' : 'No birds with vocalisation keywords found. Visit the Search page to load birds.'}</div>;
                     }
 
@@ -235,7 +236,7 @@ const SongbookPage: React.FC = () => {
                                     );
                                 })
                             ) : (
-                                <div style={{ color: '#666' }}>No recordings found</div>
+                                loading ? null : <div style={{ color: '#666' }}>No recordings found</div>
                             )}
                         </div>
                     </section>
