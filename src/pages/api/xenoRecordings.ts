@@ -49,8 +49,8 @@ const fetchXenoRecordings = async (
             return filtered;
         }
 
-        const altQuery = `en:"=${encodeURIComponent(name)}"`;
-        recs = await makeRequest(encodeURIComponent(altQuery));
+        const altQuery = `en:"=${name.replace(/ /g, '%20')}"`;
+        recs = await makeRequest(altQuery);
         const filteredAlt = recs.filter(isHighQualitySong);
         if (filteredAlt.length > 0) {
             if (redis) await redis.set(cacheKey, JSON.stringify(filteredAlt), 'EX', 600);
@@ -60,10 +60,14 @@ const fetchXenoRecordings = async (
         try {
             const EBIRD_TAXONOMY_API_URL = 'https://api.ebird.org/v2/ref/taxonomy/ebird?fmt=json&version=2019&species=';
             const response = await fetch(`${EBIRD_TAXONOMY_API_URL}${code}`);
-            if (response.ok) {
+                if (response.ok) {
                 const birdTaxon = await response.json();
-                const sci = birdTaxon?.[0]?.sciName;
+                let sci = birdTaxon?.[0]?.sciName;
                 if (sci) {
+                    const parts = sci.trim().split(/\s+/);
+                    if (parts.length === 3) {
+                        sci = parts.slice(0, 2).join(' ');
+                    }
                     const speciesQuery = encodeURIComponent(`sp:"${sci}"`);
                     recs = await makeRequest(speciesQuery);
                     const filteredSpecies = recs.filter(isHighQualitySong);
