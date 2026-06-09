@@ -22,7 +22,10 @@ const SongbookPage: React.FC = () => {
     const [selectedSpecies, setSelectedSpecies] = useState<string>('All Species');
     const lastWord = (s: string) => (s.split(' ').filter(Boolean).slice(-1)[0] || '').toLowerCase();
     const speciesList = tagsLoaded
-        ? Object.keys(birds || {}).filter(name => (birdKeywords[name] && birdKeywords[name].length > 0))
+        ? Object.keys(birds || {}).filter(name => {
+            const kws = birdKeywords[name] || [];
+            return kws.some(k => k && k.startsWith && k.startsWith('Vocalisation'));
+        })
         : Object.keys(birds || {});
     const speciesOptions = speciesList.sort((a, b) => lastWord(a).localeCompare(lastWord(b)));
 
