@@ -23,8 +23,6 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
     const lastWord = (s: string) => (s.split(' ').filter(Boolean).slice(-1)[0] || '').toLowerCase();
     const speciesOptions = Object.keys(birds || {}).sort((a, b) => lastWord(a).localeCompare(lastWord(b)));
 
-    // No tag fetching — component relies only on `birds` prop
-
     useEffect(() => {
         if (!birdNames.length) return;
         let cancelled = false;
