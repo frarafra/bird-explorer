@@ -1,9 +1,12 @@
-export function recordingAudioUrl(rec: any) {
-    if (!rec) return null;
-    if (rec.file && typeof rec.file === 'string') {
-        if (rec.file.startsWith('http')) return rec.file;
-        return rec.file.startsWith('//') ? `https:${rec.file}` : `https:${rec.file}`;
+export function recordingAudioUrl(rec: unknown): string | null {
+    if (!rec || typeof rec !== 'object') return null;
+    const r = rec as Record<string, unknown>;
+    const file = r.file;
+    if (typeof file === 'string') {
+        if (file.startsWith('http')) return file;
+        return file.startsWith('//') ? `https:${file}` : `https:${file}`;
     }
-    if (rec.id) return `https://www.xeno-canto.org/${rec.id}/download`;
+    const id = r.id;
+    if (typeof id === 'string' || typeof id === 'number') return `https://www.xeno-canto.org/${id}/download`;
     return null;
 }

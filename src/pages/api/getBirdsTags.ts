@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
-import { getRedisClient } from '../../client/redis';
 
 type BirdData = Record<string, any>;
 
@@ -11,8 +10,6 @@ type ResponseData = {
     birdKeywords?: Record<string, string[]>;
     error?: string;
 };
-
-const redis = getRedisClient();
 
 const client = new DynamoDBClient({ region: 'eu-west-1' });
 const docClient = DynamoDBDocumentClient.from(client);
@@ -268,23 +265,10 @@ export default async function handler(
     }
 
     try {
-        const { commonNames, cache } = req.body;
+        const { commonNames } = req.body;
 
         if (!Array.isArray(commonNames)) {
             return res.status(400).json({ error: 'commonNames must be array' });
-        }
-
-        if (cache && redis) {
-            try {
-                const key = `tags:${JSON.stringify([...commonNames].sort())}`;
-                const raw = await redis.get(key);
-                if (raw) {
-                    const parsed = JSON.parse(raw);
-                    return res.status(200).json(parsed);
-                }
-            } catch (err) {
-                console.warn('getBirdsTags: redis get failed', err);
-            }
         }
 
         const birds = await batchGetItemsParallel(commonNames);
@@ -336,17 +320,7 @@ export default async function handler(
             birdKeywords: filteredBirdKeywords
         };
 
-        if (cache && redis) {
-            try {
-                const key = `tags:${JSON.stringify([...commonNames].sort())}`;
-                await redis.set(key, JSON.stringify(responsePayload), 'EX', 30 * 24 * 60 * 60);
-            } catch (err) {
-                console.warn('getBirdsTags: redis set failed', err);
-            }
-        }
-
         return res.status(200).json(responsePayload);
-
     } catch (e) {
         console.error(e);
         return res.status(500).json({ error: 'Internal Server Error' });

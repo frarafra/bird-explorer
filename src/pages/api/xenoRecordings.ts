@@ -3,9 +3,9 @@ import { getRedisClient } from '../../client/redis';
 
 const redis = getRedisClient();
 
-type RecordingLike = { q?: string; type?: string };
+type Recording = { q?: string; type?: string };
 
-const isHighQualitySong = <T extends RecordingLike>(rec: T | null | undefined): rec is T & { q: 'A'; type: 'song' } => {
+const isHighQualitySong = <T extends Recording>(rec: T | null | undefined): rec is T & { q: 'A'; type: 'song' } => {
     return !!rec && rec.q === 'A' && rec.type === 'song';
 };
 
