@@ -9,6 +9,10 @@ const isHighQualitySong = <T extends Recording>(rec: T | null | undefined): rec 
     return !!rec && rec.q === 'A' && rec.type === 'song';
 };
 
+const isHighQualityCall = <T extends Recording>(rec: T | null | undefined): rec is T & { q: 'A'; type: 'call' } => {
+    return !!rec && rec.q === 'A' && rec.type === 'call';
+};
+
 const fetchXenoRecordings = async (
     name: string,
     code: string,
@@ -43,18 +47,18 @@ const fetchXenoRecordings = async (
         const primaryQuery = encodeURIComponent(`lat:${lat} lon:${lng} en:"${name}"`);
         let recs = await makeRequest(primaryQuery);
 
-        const filtered = recs.filter(isHighQualitySong);
-        if (filtered.length > 0) {
-            if (redis) await redis.set(cacheKey, JSON.stringify(filtered), 'EX', 600);
-            return filtered;
+        const filteredSongs = recs.filter(isHighQualitySong);
+        if (filteredSongs.length > 0) {
+            if (redis) await redis.set(cacheKey, JSON.stringify(filteredSongs), 'EX', 600);
+            return filteredSongs;
         }
 
         const altQuery = `en:"=${name.replace(/ /g, '%20')}"`;
         recs = await makeRequest(altQuery);
-        const filteredAlt = recs.filter(isHighQualitySong);
-        if (filteredAlt.length > 0) {
-            if (redis) await redis.set(cacheKey, JSON.stringify(filteredAlt), 'EX', 600);
-            return filteredAlt;
+        const filteredAltSongs = recs.filter(isHighQualitySong);
+        if (filteredAltSongs.length > 0) {
+            if (redis) await redis.set(cacheKey, JSON.stringify(filteredAltSongs), 'EX', 600);
+            return filteredAltSongs;
         }
 
         try {
@@ -70,10 +74,16 @@ const fetchXenoRecordings = async (
                     }
                     const speciesQuery = encodeURIComponent(`sp:"${sci}"`);
                     recs = await makeRequest(speciesQuery);
-                    const filteredSpecies = recs.filter(isHighQualitySong);
-                    if (filteredSpecies.length > 0) {
-                        if (redis) await redis.set(cacheKey, JSON.stringify(filteredSpecies), 'EX', 600);
-                        return filteredSpecies;
+                    const filteredSpeciesSongs = recs.filter(isHighQualitySong);
+                    if (filteredSpeciesSongs.length > 0) {
+                        if (redis) await redis.set(cacheKey, JSON.stringify(filteredSpeciesSongs), 'EX', 600);
+                        return filteredSpeciesSongs;
+                    }
+
+                    const filteredSpeciesCalls = recs.filter(isHighQualityCall);
+                    if (filteredSpeciesCalls.length > 0) {
+                        if (redis) await redis.set(cacheKey, JSON.stringify(filteredSpeciesCalls), 'EX', 600);
+                        return filteredSpeciesCalls;
                     }
                 }
             }

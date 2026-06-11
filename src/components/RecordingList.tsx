@@ -21,7 +21,11 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
     const [selectedSpecies, setSelectedSpecies] = useState<string>('All Species');
 
     const lastWord = (s: string) => (s.split(' ').filter(Boolean).slice(-1)[0] || '').toLowerCase();
-    const speciesOptions = Object.keys(birds || {}).sort((a, b) => lastWord(a).localeCompare(lastWord(b)));
+    const speciesOptions = Object.keys(birds || {}).sort((a, b) => {
+        const cmp = lastWord(a).localeCompare(lastWord(b));
+        if (cmp !== 0) return cmp;
+        return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
 
     useEffect(() => {
         if (!birdNames.length) return;
