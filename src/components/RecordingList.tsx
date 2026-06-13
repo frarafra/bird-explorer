@@ -32,43 +32,22 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
 
     const birdNames = Object.keys(birds || {});
 
-    const lastWord = (s: string) =>
-        (s.split(" ").filter(Boolean).slice(-1)[0] || "").toLowerCase();
-
-    const speciesOptions = [...birdNames].sort((a, b) => {
-        const cmp = lastWord(a).localeCompare(lastWord(b));
-
-        if (cmp !== 0) {
-            return cmp;
-        }
-
-        return a.toLowerCase().localeCompare(b.toLowerCase());
-    });
-
     useEffect(() => {
-        if (!birdNames.length) {
-            return;
-        }
+        if (!birdNames.length) return;
 
         let cancelled = false;
 
         const loadPage = async () => {
             const names = [...birdNames].reverse();
-
             const start = page * PAGE_SIZE;
 
-            const pageNames = names.slice(
-                start,
-                start + PAGE_SIZE
-            );
+            const pageNames = names.slice(start, start + PAGE_SIZE);
 
             const namesToFetch = pageNames.filter(
                 (name) => !(name in recordings)
             );
 
-            if (namesToFetch.length === 0) {
-                return;
-            }
+            if (namesToFetch.length === 0) return;
 
             setLoading(true);
             setError(null);
@@ -81,16 +60,11 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
                     lon: mapCenter?.lng
                 }));
 
-                const proxyRes = await fetch(
-                    "/api/xenoRecordings",
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify(queries)
-                    }
-                );
+                const proxyRes = await fetch("/api/xenoRecordings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(queries)
+                });
 
                 if (!proxyRes.ok) {
                     throw new Error(`HTTP ${proxyRes.status}`);
@@ -102,8 +76,7 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
                 const out: Record<string, Recording[]> = {};
 
                 for (const name of namesToFetch) {
-                    const rs = results[name] || [];
-                    out[name] = rs.slice(0, 1);
+                    out[name] = (results[name] || []).slice(0, 1);
                 }
 
                 if (!cancelled) {
@@ -113,21 +86,11 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
                     }));
                 }
             } catch (err) {
-                console.warn(
-                    "Songbook: xeno proxy fetch failed",
-                    err
-                );
-
                 if (!cancelled) {
-                    setError(
-                        (err as Error).message ||
-                            "Error fetching recordings"
-                    );
+                    setError((err as Error).message || "Error fetching recordings");
                 }
             } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
+                if (!cancelled) setLoading(false);
             }
         };
 
@@ -141,13 +104,8 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
     const onSelectSpecies = async (species: string) => {
         setSelectedSpecies(species);
 
-        if (species === "All Species") {
-            return;
-        }
-
-        if (species in recordings) {
-            return;
-        }
+        if (species === "All Species") return;
+        if (species in recordings) return;
 
         setLoading(true);
         setError(null);
@@ -160,16 +118,11 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
                 lon: mapCenter?.lng
             };
 
-            const proxyRes = await fetch(
-                "/api/xenoRecordings",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify([query])
-                }
-            );
+            const proxyRes = await fetch("/api/xenoRecordings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify([query])
+            });
 
             if (!proxyRes.ok) {
                 throw new Error(`HTTP ${proxyRes.status}`);
@@ -184,15 +137,7 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
                 [species]: rs.slice(0, 1)
             }));
         } catch (err) {
-            console.warn(
-                "Songbook: xeno proxy fetch failed",
-                err
-            );
-
-            setError(
-                (err as Error).message ||
-                    "Error fetching recordings"
-            );
+            setError((err as Error).message || "Error fetching recordings");
         } finally {
             setLoading(false);
         }
@@ -202,98 +147,48 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
 
     const visibleNames =
         selectedSpecies !== "All Species"
-            ? names.filter(
-                  (name) => name === selectedSpecies
-              )
-            : names.slice(
-                  0,
-                  (page + 1) * PAGE_SIZE
-              );
+            ? names.filter((name) => name === selectedSpecies)
+            : names.slice(0, (page + 1) * PAGE_SIZE);
 
-    const visibleRecordings: RecordingGroup[] =
-        visibleNames.map((name) => ({
-            name,
-            recordings: recordings[name] || []
-        }));
+    const visibleRecordings: RecordingGroup[] = visibleNames.map((name) => ({
+        name,
+        recordings: recordings[name] || []
+    }));
 
     return (
         <div>
             <div style={{ marginBottom: 12 }}>
                 <select
                     value={selectedSpecies}
-                    onChange={(e) =>
-                        onSelectSpecies(e.target.value)
-                    }
-                    style={{
-                        marginBottom: 8,
-                        padding: 8
-                    }}
+                    onChange={(e) => onSelectSpecies(e.target.value)}
+                    style={{ marginBottom: 8, padding: 8 }}
                 >
-                    <option value="All Species">
-                        All Species
-                    </option>
-
-                    {speciesOptions.map((species) => (
-                        <option
-                            key={species}
-                            value={species}
-                        >
+                    <option value="All Species">All Species</option>
+                    {Object.keys(birds).map((species) => (
+                        <option key={species} value={species}>
                             {species}
                         </option>
                     ))}
                 </select>
             </div>
 
-            {loading && (
-                <p>Loading recordings…</p>
-            )}
-
-            {error && (
-                <p style={{ color: "red" }}>
-                    {error}
-                </p>
-            )}
-
-            {!loading &&
-                !error &&
-                birdNames.length === 0 && (
-                    <p>
-                        No birds with vocalisation
-                        keywords found. Visit the Search
-                        page to load birds.
-                    </p>
-                )}
+            {error && <p style={{ color: "red" }}>{error}</p>}
 
             {birdNames.length > 0 && (
                 <Recordings
                     recordings={visibleRecordings}
+                    loading={loading}
                 />
             )}
 
             {selectedSpecies === "All Species" &&
-                birdNames.length >
-                    (page + 1) * PAGE_SIZE && (
-                    <div
-                        style={{
-                            textAlign: "center",
-                            marginTop: 12
-                        }}
-                    >
+                birdNames.length > (page + 1) * PAGE_SIZE && (
+                    <div style={{ textAlign: "center", marginTop: 12 }}>
                         <button
-                            onClick={() =>
-                                setPage((p) => p + 1)
-                            }
+                            onClick={() => setPage((p) => p + 1)}
                             disabled={loading}
-                            style={{
-                                padding: "8px 16px",
-                                cursor: loading
-                                    ? "not-allowed"
-                                    : "pointer"
-                            }}
                         >
-                            {loading
-                                ? "Loading…"
-                                : "Load More"}
+                            {loading ? "Loading…" : "Load More"}
                         </button>
                     </div>
                 )}

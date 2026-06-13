@@ -12,27 +12,30 @@ interface RecordingGroup {
 
 interface Props {
     recordings: RecordingGroup[];
+    loading?: boolean;
 }
 
-const Recordings: React.FC<Props> = ({ recordings }) => {
+const Recordings: React.FC<Props> = ({ recordings, loading }) => {
     return (
         <>
             {recordings.map(({ name, recordings }) => (
-                <section
-                    key={name}
-                    style={{ marginBottom: 24 }}
-                >
+                <section key={name} style={{ marginBottom: 24 }}>
                     <h3
                         style={{
                             textTransform: "capitalize",
                             backgroundColor: "#f0f0f0",
-                            padding: "8px",
+                            padding: "8px"
                         }}
                     >
                         {name}
                     </h3>
 
-                    {recordings.length > 0 ? (
+                    {/* ✅ KEY FIX */}
+                    {loading && recordings.length === 0 ? (
+                        <div style={{ color: "#666" }}>
+                            Loading recordings…
+                        </div>
+                    ) : recordings.length > 0 ? (
                         recordings.map((rec) => {
                             const r = rec as Record<string, unknown>;
 
@@ -44,9 +47,7 @@ const Recordings: React.FC<Props> = ({ recordings }) => {
                                     : undefined;
 
                             const src =
-                                recordingAudioUrl(rec) ||
-                                file ||
-                                null;
+                                recordingAudioUrl(rec) || file || null;
 
                             const pageUrl =
                                 typeof r.id === "string" ||
@@ -56,45 +57,28 @@ const Recordings: React.FC<Props> = ({ recordings }) => {
                                     ? r.url
                                     : "#";
 
-                            const loc =
-                                typeof r.loc === "string"
-                                    ? r.loc
-                                    : "";
-
+                            const loc = typeof r.loc === "string" ? r.loc : "";
                             const recorder =
-                                typeof r.recorder === "string"
-                                    ? r.recorder
-                                    : "";
-
+                                typeof r.recorder === "string" ? r.recorder : "";
                             const country =
-                                typeof r.country === "string"
-                                    ? r.country
-                                    : "";
-
+                                typeof r.country === "string" ? r.country : "";
                             const date =
-                                typeof r.date === "string"
-                                    ? r.date
-                                    : "";
+                                typeof r.date === "string" ? r.date : "";
 
                             return (
                                 <div
-                                    key={
-                                        typeof r.id === "string" ||
-                                        typeof r.id === "number"
-                                            ? String(r.id)
-                                            : JSON.stringify(r)
-                                    }
+                                    key={String(r.id ?? JSON.stringify(r))}
                                     style={{
                                         border: "1px solid #eee",
                                         padding: 8,
-                                        marginBottom: 8,
+                                        marginBottom: 8
                                     }}
                                 >
                                     <div
                                         style={{
                                             display: "flex",
                                             justifyContent: "space-between",
-                                            gap: 12,
+                                            gap: 12
                                         }}
                                     >
                                         <div>
@@ -103,20 +87,11 @@ const Recordings: React.FC<Props> = ({ recordings }) => {
                                             </div>
 
                                             <div
-                                                style={{
-                                                    fontSize: 12,
-                                                    color: "#666",
-                                                }}
+                                                style={{ fontSize: 12, color: "#666" }}
                                             >
-                                                {recorder
-                                                    ? `Recorder: ${recorder}`
-                                                    : ""}
-                                                {country
-                                                    ? ` — ${country}`
-                                                    : ""}
-                                                {date
-                                                    ? ` — ${date}`
-                                                    : ""}
+                                                {recorder && `Recorder: ${recorder}`}
+                                                {country && ` — ${country}`}
+                                                {date && ` — ${date}`}
                                             </div>
                                         </div>
 
@@ -138,14 +113,14 @@ const Recordings: React.FC<Props> = ({ recordings }) => {
                                             src={src}
                                             style={{
                                                 width: "100%",
-                                                marginTop: 8,
+                                                marginTop: 8
                                             }}
                                         />
                                     ) : (
                                         <div
                                             style={{
                                                 marginTop: 8,
-                                                color: "#888",
+                                                color: "#888"
                                             }}
                                         >
                                             No direct audio URL available
@@ -155,9 +130,11 @@ const Recordings: React.FC<Props> = ({ recordings }) => {
                             );
                         })
                     ) : (
-                        <div style={{ color: "#666" }}>
-                            No recordings found
-                        </div>
+                        !loading && (
+                            <div style={{ color: "#666" }}>
+                                No recordings found
+                            </div>
+                        )
                     )}
                 </section>
             ))}
