@@ -5,12 +5,23 @@ const redis = getRedisClient();
 
 type Recording = { q?: string; type?: string };
 
-const isHighQualitySong = <T extends Recording>(rec: T | null | undefined): rec is T & { q: 'A'; type: 'song' } => {
-    return !!rec && rec.q === 'A' && rec.type === 'song';
-};
-
 const isHighQualityCall = <T extends Recording>(rec: T | null | undefined): rec is T & { q: 'A'; type: 'call' } => {
     return !!rec && rec.q === 'A' && rec.type === 'call';
+};
+
+const filterHighQualitySongs = (recs: Recording[]) => {
+    const songsA: Recording[] = [];
+    const songsB: Recording[] = [];
+    for (const r of recs) {
+        if (r && r.type === 'song' && r.q === 'A') {
+            songsA.push(r);
+        } else if (r && r.type === 'song' && r.q === 'B') {
+            songsB.push(r);
+        }
+    }
+    if (songsA.length > 0) return songsA;
+    if (songsB.length > 0) return songsB;
+    return [];
 };
 
 const fetchXenoRecordings = async (
@@ -47,18 +58,18 @@ const fetchXenoRecordings = async (
         const primaryQuery = encodeURIComponent(`lat:${lat} lon:${lng} en:"${name}"`);
         let recs = await makeRequest(primaryQuery);
 
-        const filteredSongs = recs.filter(isHighQualitySong);
-        if (filteredSongs.length > 0) {
-            if (redis) await redis.set(cacheKey, JSON.stringify(filteredSongs), 'EX', 600);
-            return filteredSongs;
+        const preferred = filterHighQualitySongs(recs);
+        if (preferred.length > 0) {
+            if (redis) await redis.set(cacheKey, JSON.stringify(preferred), 'EX', 600);
+            return preferred;
         }
 
         const altQuery = `en:"=${name.replace(/ /g, '%20')}"`;
         recs = await makeRequest(altQuery);
-        const filteredAltSongs = recs.filter(isHighQualitySong);
-        if (filteredAltSongs.length > 0) {
-            if (redis) await redis.set(cacheKey, JSON.stringify(filteredAltSongs), 'EX', 600);
-            return filteredAltSongs;
+        const preferredAlt = filterHighQualitySongs(recs);
+        if (preferredAlt.length > 0) {
+            if (redis) await redis.set(cacheKey, JSON.stringify(preferredAlt), 'EX', 600);
+            return preferredAlt;
         }
 
         try {
@@ -74,10 +85,10 @@ const fetchXenoRecordings = async (
                     }
                     const speciesQuery = encodeURIComponent(`sp:"${sci}"`);
                     recs = await makeRequest(speciesQuery);
-                    const filteredSpeciesSongs = recs.filter(isHighQualitySong);
-                    if (filteredSpeciesSongs.length > 0) {
-                        if (redis) await redis.set(cacheKey, JSON.stringify(filteredSpeciesSongs), 'EX', 600);
-                        return filteredSpeciesSongs;
+                    const preferredSpecies = filterHighQualitySongs(recs);
+                    if (preferredSpecies.length > 0) {
+                        if (redis) await redis.set(cacheKey, JSON.stringify(preferredSpecies), 'EX', 600);
+                        return preferredSpecies;
                     }
 
                     const filteredSpeciesCalls = recs.filter(isHighQualityCall);
