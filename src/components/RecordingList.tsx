@@ -145,6 +145,19 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
 
     const names = [...birdNames].reverse();
 
+    const sortedSpecies = [...Object.keys(birds || {})].sort((a, b) => {
+        const lastWord = (value: string) =>
+            value.trim().split(/\s+/).filter(Boolean).slice(-1)[0]?.toLowerCase() || "";
+        const firstWord = (value: string) =>
+            value.trim().split(/\s+/).filter(Boolean)[0] || "";
+
+        return (
+            lastWord(a).localeCompare(lastWord(b)) ||
+            firstWord(a).localeCompare(firstWord(b)) ||
+            a.localeCompare(b)
+        );
+    });
+
     const visibleNames =
         selectedSpecies !== "All Species"
             ? names.filter((name) => name === selectedSpecies)
@@ -164,7 +177,7 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
                     style={{ marginBottom: 8, padding: 8 }}
                 >
                     <option value="All Species">All Species</option>
-                    {Object.keys(birds).map((species) => (
+                    {sortedSpecies.map((species) => (
                         <option key={species} value={species}>
                             {species}
                         </option>

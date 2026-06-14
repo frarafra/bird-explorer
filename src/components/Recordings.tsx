@@ -30,7 +30,6 @@ const Recordings: React.FC<Props> = ({ recordings, loading }) => {
                         {name}
                     </h3>
 
-                    {/* ✅ KEY FIX */}
                     {loading && recordings.length === 0 ? (
                         <div style={{ color: "#666" }}>
                             Loading recordings…
