@@ -1,28 +1,35 @@
 import React, { FC } from 'react';
 import Link from 'next/link';
+import styles from './MainLayout.module.css';
 
 interface MainLayoutProps {
-    children: React.ReactNode;
-    shareButton?: React.ReactNode;
+  children: React.ReactNode;
+  shareButton?: React.ReactNode;
 }
 
 const MainLayout: FC<MainLayoutProps> = ({ children, shareButton }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 40px', backgroundColor: '#f8f9fa', borderBottom: '1px solid #e9ecef' }}>
-            <nav style={{ flex: 1, textAlign: 'left' }}>
-                <ul style={{ listStyleType: 'none', display: 'flex', gap: '2rem' }}>
-                    <li><Link href="/">Search</Link></li>
-                    <li><Link href="/birds">Birds</Link></li>
-                    <li><Link href="/songbook">Songbook</Link></li>
-                </ul>
-            </nav>
-            {shareButton && <div className="share-button">{shareButton}</div>}
-        </header>
+  <div className={styles.container}>
+    <header className={styles.header}>
+      <nav className={styles.nav}>
+        <ul className={styles.menu}>
+          <li><Link href="/">Search</Link></li>
+          <li><Link href="/birds">Birds</Link></li>
+          <li><Link href="/songbook">Songbook</Link></li>
+          <li><Link href="/quizzes">Quizzes</Link></li>
+        </ul>
+      </nav>
 
-        <main style={{ padding: '1rem' }}>
-            {children}
-        </main>
-    </div>
+      {shareButton && (
+        <div className={styles.shareButton}>
+          {shareButton}
+        </div>
+      )}
+    </header>
+
+    <main className={styles.main}>
+      {children}
+    </main>
+  </div>
 );
 
 export default MainLayout;

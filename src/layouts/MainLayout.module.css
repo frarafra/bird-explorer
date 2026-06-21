@@ -1,0 +1,36 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 40px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.nav {
+  flex: 1;
+}
+
+.menu {
+  list-style: none;
+  display: flex;
+  gap: 2rem;
+  margin: 0;
+  padding: 0;
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 12px 16px;
+  }
+
+  .menu {
+    gap: 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .shareButton {
+    margin-left: 12px;
+    flex-shrink: 0;
+  }
+}
