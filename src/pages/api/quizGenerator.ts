@@ -114,7 +114,6 @@ export default async function handler(
 
     if (!ebirdTool) throw new Error("MCP tool not found");
 
-    // 2. MCP CALL
     const raw = await ebirdTool.invoke({
       lat: Number(lat),
       lng: Number(lng),
