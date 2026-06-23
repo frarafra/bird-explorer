@@ -20,8 +20,8 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
         setRecordings,
         selectedSpecies,
         setSelectedSpecies,
-        page,
-        setPage
+        pageRec,
+        setPageRec
     } = useContext(BirdContext);
 
     const PAGE_SIZE =
@@ -39,7 +39,7 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
 
         const loadPage = async () => {
             const names = [...birdNames].reverse();
-            const start = page * PAGE_SIZE;
+            const start = pageRec * PAGE_SIZE;
 
             const pageNames = names.slice(start, start + PAGE_SIZE);
 
@@ -99,7 +99,7 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
         return () => {
             cancelled = true;
         };
-    }, [page, birds, mapCenter]);
+    }, [pageRec, birds, mapCenter]);
 
     const onSelectSpecies = async (species: string) => {
         setSelectedSpecies(species);
@@ -161,7 +161,7 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
     const visibleNames =
         selectedSpecies !== "All Species"
             ? names.filter((name) => name === selectedSpecies)
-            : names.slice(0, (page + 1) * PAGE_SIZE);
+            : names.slice(0, (pageRec + 1) * PAGE_SIZE);
 
     const visibleRecordings: RecordingGroup[] = visibleNames.map((name) => ({
         name,
@@ -195,10 +195,10 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
             )}
 
             {selectedSpecies === "All Species" &&
-                birdNames.length > (page + 1) * PAGE_SIZE && (
+                birdNames.length > (pageRec + 1) * PAGE_SIZE && (
                     <div style={{ textAlign: "center", marginTop: 12 }}>
                         <button
-                            onClick={() => setPage((p) => p + 1)}
+                            onClick={() => setPageRec((p) => p + 1)}
                             disabled={loading}
                         >
                             {loading ? "Loading…" : "Load More"}

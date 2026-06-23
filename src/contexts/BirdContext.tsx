@@ -38,6 +38,9 @@ interface BirdContextType {
     page: number;
     setPage: React.Dispatch<React.SetStateAction<number>>;
 
+    pageRec: number;
+    setPageRec: React.Dispatch<React.SetStateAction<number>>;
+
     selectedGroup: string;
     setSelectedGroup: React.Dispatch<React.SetStateAction<string>>;
 
@@ -69,6 +72,9 @@ export const BirdContext = createContext<BirdContextType>({
 
     page: 0,
     setPage: () => {},
+
+    pageRec: 0,
+    setPageRec: () => {},
 
     selectedGroup: 'All Groups',
     setSelectedGroup: () => {},
@@ -120,8 +126,12 @@ export const BirdProvider: FC<BirdProviderProps> = ({
 
     const [page, setPage] = useState(0);
 
+    const [pageRec, setPageRec] = useState(0);
+
+
     useEffect(() => {
         setPage(0);
+        setPageRec(0);
 
         setBirdImages({});
 
@@ -151,6 +161,9 @@ export const BirdProvider: FC<BirdProviderProps> = ({
 
                 page,
                 setPage,
+
+                pageRec,
+                setPageRec,
 
                 selectedGroup,
                 setSelectedGroup,
