@@ -12,8 +12,8 @@ type Observation = {
 
 const llm = new ChatOpenAI({
   apiKey: process.env.NEXT_PUBLIC_HUGGINGFACE_API_KEY!,
-  model: process.env.NEXT_PUBLIC_HUGGINGFACE_MODEL || "gpt-4o-mini",
-  temperature: 0.8,
+  model: process.env.NEXT_PUBLIC_HUGGINGFACE_MODEL!,
+  temperature: 0.9,
   configuration: {
     baseURL: "https://router.huggingface.co/v1",
   },
@@ -156,7 +156,6 @@ export default async function handler(
     );
 
     const compactData = validBirds
-      .slice(0, 10)
       .map(
         (o) =>
           `${o.comName} | ${o.locName} | ${o.obsDt} | ${o.howMany}`
