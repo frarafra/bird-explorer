@@ -1,49 +1,80 @@
 "use client";
 
-import React, { useContext, useState } from 'react';
-import { BirdContext } from '../contexts/BirdContext';
+import React, { useContext, useState } from "react";
+import { BirdContext } from "../contexts/BirdContext";
 
 const QuizGenerator: React.FC = () => {
-    const { mapCenter } = useContext(BirdContext);
-    const [loading, setLoading] = useState(false);
-    const [quiz, setQuiz] = useState('');
+  const { mapCenter } = useContext(BirdContext);
 
-    async function generateQuiz() {
-        setLoading(true);
-        setQuiz('');
+  const [loading, setLoading] = useState(false);
+  const [quiz, setQuiz] = useState("");
+  const [imageQuiz, setImageQuiz] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
 
-        try {
-            const res = await fetch('/api/quizGenerator', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ lat: mapCenter.lat, lng: mapCenter.lng, dist: 25 }),
-            });
+  async function generateQuiz() {
+    setLoading(true);
 
-            const data = await res.json();
-            setQuiz(data.quiz || data.error || 'No quiz generated.');
-        } catch (error) {
-            setQuiz('Unable to generate a quiz right now.');
-        } finally {
-            setLoading(false);
-        }
+    setQuiz("");
+    setImageQuiz("");
+    setImageUrl("");
+
+    try {
+      const res = await fetch("/api/quizGenerator", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lat: mapCenter.lat,
+          lng: mapCenter.lng,
+          dist: 25,
+        }),
+      });
+
+      const data = await res.json();
+
+      setQuiz(data.quiz || "");
+      setImageQuiz(data.imageQuiz || "");
+      setImageUrl(data.imageUrl || "");
+    } catch (err) {
+      setQuiz("Unable to generate quiz.");
+    } finally {
+      setLoading(false);
     }
+  }
 
-    return (
-        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-            <h3>🐦 Bird Observations Quizzes</h3>
-            <p style={{ color: '#6c757d', marginBottom: 12 }}>
-                Generate quizzes based on birds near your current map location.
-            </p>
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto" }}>
+      <h3>🐦 Bird Quiz</h3>
 
-            <button onClick={generateQuiz} disabled={loading} style={{ marginTop: 10 }}>
-                {loading ? 'Generating...' : 'Generate Quiz'}
-            </button>
+      <button onClick={generateQuiz} disabled={loading}>
+        {loading ? "Generating..." : "Generate Quiz"}
+      </button>
 
-            <pre style={{ marginTop: 20, whiteSpace: 'pre-wrap' }}>
-                {quiz}
-            </pre>
+      <pre style={{ whiteSpace: "pre-wrap", marginTop: 20 }}>
+        {quiz}
+      </pre>
+
+      {imageQuiz && (
+        <div style={{ marginTop: 30 }}>
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              alt="Bird quiz"
+              style={{
+                width: "100%",
+                maxWidth: 500,
+                borderRadius: 8,
+                marginBottom: 15,
+              }}
+            />
+          )}
+
+          <pre style={{ whiteSpace: "pre-wrap" }}>
+            {imageQuiz}
+          </pre>
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
 export default QuizGenerator;
