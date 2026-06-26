@@ -19,6 +19,59 @@ const llm = new ChatOpenAI({
   },
 });
 
+const mcpUrl = process.env.NEXT_PUBLIC_MCP_URL!;
+
+let mcpClient: MultiServerMCPClient | null = null;
+let ebirdTool: any = null;
+let imageTool: any = null;
+let initializing: Promise<void> | null = null;
+
+async function initMcp() {
+  if (ebirdTool && imageTool) {
+    return;
+  }
+
+  if (initializing) {
+    await initializing;
+    return;
+  }
+
+  initializing = (async () => {
+    mcpClient = new MultiServerMCPClient({
+      mcpServers: {
+        ebird: {
+          transport: "http",
+          url: mcpUrl,
+        },
+      },
+    });
+
+    const tools = await mcpClient.getTools();
+
+    ebirdTool = tools.find(
+      (t) => t.name === "ebird_species_search"
+    );
+
+    imageTool = tools.find(
+      (t) => t.name === "ebird_images"
+    );
+
+    if (!ebirdTool) {
+      throw new Error("ebird_species_search tool not found");
+    }
+
+    if (!imageTool) {
+      throw new Error("ebird_images tool not found");
+    }
+  })();
+
+  try {
+    await initializing;
+  } finally {
+    initializing = null;
+  }
+}
+
 function shuffle<T>(arr: T[]) {
   return [...arr].sort(() => Math.random() - 0.5);
 }
@@ -125,23 +178,7 @@ export default async function handler(
   try {
     const { lat, lng, dist = 25 } = req.body;
 
-    const mcpUrl = process.env.NEXT_PUBLIC_MCP_URL;
-    if (!mcpUrl) throw new Error("Missing MCP URL");
-
-    mcpClient = new MultiServerMCPClient({
-      mcpServers: {
-        ebird: {
-          transport: "http",
-          url: mcpUrl,
-        },
-      },
-    });
-
-    const tools = await mcpClient.getTools();
-
-    const ebirdTool = tools.find(
-      (t) => t.name === "ebird_species_search"
-    );
+    await initMcp();
 
     const raw = await ebirdTool!.invoke({
       lat: Number(lat),
@@ -155,18 +192,14 @@ export default async function handler(
       (b) => b?.comName && b?.speciesCode
     );
 
-    const compactData = validBirds
+    const randomBirds = shuffle(validBirds).slice(0, 12);
+
+    const compactData = randomBirds
       .map(
         (o) =>
           `${o.comName} | ${o.locName} | ${o.obsDt} | ${o.howMany}`
       )
       .join("\n");
-
-    const imageTool = tools.find(
-      (t) => t.name === "ebird_images"
-    );
-
-    const randomBirds = shuffle(validBirds).slice(0, 12);
 
     const imagePayload = Object.fromEntries(
       randomBirds.map((o) => [
