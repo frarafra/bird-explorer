@@ -7,9 +7,14 @@ const QuizGenerator: React.FC = () => {
   const { mapCenter } = useContext(BirdContext);
 
   const [loading, setLoading] = useState(false);
+
   const [quiz, setQuiz] = useState("");
+
   const [imageQuiz, setImageQuiz] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+
+  const [audioQuiz, setAudioQuiz] = useState("");
+  const [audioUrl, setAudioUrl] = useState("");
 
   async function generateQuiz() {
     setLoading(true);
@@ -17,6 +22,8 @@ const QuizGenerator: React.FC = () => {
     setQuiz("");
     setImageQuiz("");
     setImageUrl("");
+    setAudioQuiz("");
+    setAudioUrl("");
 
     try {
       const res = await fetch("/api/quizGenerator", {
@@ -34,6 +41,9 @@ const QuizGenerator: React.FC = () => {
       setQuiz(data.quiz || "");
       setImageQuiz(data.imageQuiz || "");
       setImageUrl(data.imageUrl || "");
+
+      setAudioQuiz(data.audioQuiz || "");
+      setAudioUrl(data.audioUrl || "");
     } catch (err) {
       setQuiz("Unable to generate quiz.");
     } finally {
@@ -49,9 +59,11 @@ const QuizGenerator: React.FC = () => {
         {loading ? "Generating..." : "Generate Quiz"}
       </button>
 
-      <pre style={{ whiteSpace: "pre-wrap", marginTop: 20 }}>
-        {quiz}
-      </pre>
+      {quiz && (
+        <pre style={{ whiteSpace: "pre-wrap", marginTop: 20 }}>
+          {quiz}
+        </pre>
+      )}
 
       {imageQuiz && (
         <div style={{ marginTop: 30 }}>
@@ -70,6 +82,24 @@ const QuizGenerator: React.FC = () => {
 
           <pre style={{ whiteSpace: "pre-wrap" }}>
             {imageQuiz}
+          </pre>
+        </div>
+      )}
+
+      {audioQuiz && audioUrl && (
+        <div style={{ marginTop: 30 }}>
+          <audio
+            controls
+            preload="none"
+            src={audioUrl}
+            style={{
+              width: "100%",
+              marginBottom: 12,
+            }}
+          />
+
+          <pre style={{ whiteSpace: "pre-wrap" }}>
+            {audioQuiz}
           </pre>
         </div>
       )}

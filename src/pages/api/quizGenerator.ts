@@ -24,10 +24,11 @@ const mcpUrl = process.env.NEXT_PUBLIC_MCP_URL!;
 let mcpClient: MultiServerMCPClient | null = null;
 let ebirdTool: any = null;
 let imageTool: any = null;
+let recordingTool: any = null;
 let initializing: Promise<void> | null = null;
 
 async function initMcp() {
-  if (ebirdTool && imageTool) {
+  if (ebirdTool && imageTool && recordingTool) {
     return;
   }
 
@@ -56,13 +57,18 @@ async function initMcp() {
       (t) => t.name === "ebird_images"
     );
 
-    if (!ebirdTool) {
-      throw new Error("ebird_species_search tool not found");
-    }
+    recordingTool = tools.find(
+      (t) => t.name === "xeno_recordings"
+    );
 
-    if (!imageTool) {
+    if (!ebirdTool)
+      throw new Error("ebird_species_search tool not found");
+
+    if (!imageTool)
       throw new Error("ebird_images tool not found");
-    }
+
+    if (!recordingTool)
+      throw new Error("xeno_recordings tool not found");
   })();
 
   try {
@@ -84,9 +90,9 @@ RULES:
 - ONLY use provided bird observation data
 - DO NOT hallucinate species or locations
 - EACH quiz must be different from previous ones
-- Vary birds, locations, and counts
+- Vary locations
 - EACH question MUST be a full question sentence
-- EXACTLY 3 multiple-choice questions
+- EXACTLY 1 multiple-choice question
 - NO explanations
 
 DATA:
@@ -95,20 +101,6 @@ ${data}
 FORMAT:
 
 Q1: <full question>
-A)
-B)
-C)
-D)
-Answer: X
-
-Q2: <full question>
-A)
-B)
-C)
-D)
-Answer: X
-
-Q3: <full question>
 A)
 B)
 C)
@@ -169,6 +161,62 @@ function normalizeMCP(raw: any): Observation[] {
   throw new Error("Invalid MCP response format");
 }
 
+function normalizeRecording(raw: any, birdName: string) {
+  const data =
+    typeof raw === "string"
+      ? JSON.parse(raw)
+      : raw;
+
+  const recordings = data.results?.[birdName];
+
+  if (!recordings?.length) {
+    throw new Error(`No recordings found for ${birdName}`);
+  }
+
+  return recordings;
+}
+
+function generateAudioQuiz(
+  correctBird: Observation,
+  randomBirds: Observation[],
+  recordings: any[]
+) {
+  if (!correctBird.comName) {
+    throw new Error("Missing bird name");
+  }
+
+  const recording =
+    recordings[Math.floor(Math.random() * recordings.length)];
+
+  const wrongBirds = shuffle(
+    randomBirds
+      .map((b) => b.comName!)
+      .filter((name) => name !== correctBird.comName)
+  ).slice(0, 3);
+
+  const options = shuffle([
+    correctBird.comName,
+    ...wrongBirds,
+  ]);
+
+  const answer =
+    ["A", "B", "C", "D"][
+      options.indexOf(correctBird.comName)
+    ];
+
+  return {
+    audioUrl: recording.file,
+    quiz: `Q5: Which bird is singing in this recording?
+
+A) ${options[0]}
+B) ${options[1]}
+C) ${options[2]}
+D) ${options[3]}
+
+Answer: ${answer}`,
+  };
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -217,6 +265,29 @@ export default async function handler(
         ? JSON.parse(imageRaw)
         : imageRaw;
 
+    const singingBird =
+      randomBirds[Math.floor(Math.random() * randomBirds.length)];
+
+    const recordingPayload = {
+      queries: [
+        {
+          name: singingBird.comName!,
+          code: singingBird.speciesCode!,
+          lat: Number(lat),
+          lon: Number(lng),
+        },
+      ],
+    };
+
+    const recordingRaw = await recordingTool!.invoke(
+      recordingPayload
+    );
+
+    const recordings = normalizeRecording(
+      recordingRaw,
+      singingBird.comName!
+    );
+
     const obsMsg = await llm.invoke([
       {
         role: "user",
@@ -231,10 +302,18 @@ export default async function handler(
 
     const imageQuiz = generateImageQuiz(images);
 
+    const audioQuiz = generateAudioQuiz(
+      singingBird,
+      randomBirds,
+      recordings
+    );
+
     return res.status(200).json({
       quiz: quizText,
       imageQuiz: imageQuiz.quiz,
       imageUrl: imageQuiz.imageUrl,
+      audioQuiz: audioQuiz.quiz,
+      audioUrl: audioQuiz.audioUrl,
     });
   } catch (err: any) {
     console.error("[API ERROR]", err);
