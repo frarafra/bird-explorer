@@ -103,15 +103,20 @@ const fetchImagesInBatches = async (birds: Record<string, string>, batchSize: nu
     return results;
 };
 
+export async function getBirdImages(
+  birds: Record<string, string>
+) {
+  const batchConcSize = Number(process.env.NEXT_PUBLIC_BATCH_CONC_SIZE);
+
+  const delayMs = Number(process.env.NEXT_PUBLIC_DELAY_BETWEEN_BATCHES_MS);
+
+  return fetchImagesInBatches(birds, batchConcSize, delayMs);
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
         if (req.method === 'POST') {
-            const birds = req.body;
-     
-            const batchConcSize = Number(process.env.NEXT_PUBLIC_BATCH_CONC_SIZE);
-            const delayMs = Number(process.env.NEXT_PUBLIC_DELAY_BETWEEN_BATCHES_MS);
-
-            const successfulResults = await fetchImagesInBatches(birds, batchConcSize, delayMs);
+            const successfulResults = await getBirdImages(req.body);
             console.log('Fetched image results:', successfulResults);
 
             res.status(200).json(successfulResults);

@@ -14,3 +14,11 @@ export interface MapCenter {
   lat: number;
   lng: number;
 }
+
+export type Observation = {
+  comName?: string;
+  locName?: string;
+  obsDt?: string;
+  howMany?: number;
+  speciesCode?: string;
+};

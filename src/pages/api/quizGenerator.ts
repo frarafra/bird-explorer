@@ -1,14 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { ChatOpenAI } from "@langchain/openai";
 
-type Observation = {
-  comName?: string;
-  locName?: string;
-  obsDt?: string;
-  howMany?: number;
-  speciesCode?: string;
-};
+import { initMcp } from "../../client/mcp";
+import { normalizeMCP, normalizeRecording, shuffle } from "../../utils/quiz";
+import { searchSpecies } from "./ebirdSpeciesSearch";
+import { getBirdImages } from "./ebirdImages";
+import { getXenoRecordings } from "./xenoRecordings";
+import { Observation } from "../../types";
 
 const llm = new ChatOpenAI({
   apiKey: process.env.NEXT_PUBLIC_HUGGINGFACE_API_KEY!,
@@ -18,69 +16,6 @@ const llm = new ChatOpenAI({
     baseURL: "https://router.huggingface.co/v1",
   },
 });
-
-const mcpUrl = process.env.NEXT_PUBLIC_MCP_URL!;
-
-let mcpClient: MultiServerMCPClient | null = null;
-let ebirdTool: any = null;
-let imageTool: any = null;
-let recordingTool: any = null;
-let initializing: Promise<void> | null = null;
-
-async function initMcp() {
-  if (ebirdTool && imageTool && recordingTool) {
-    return;
-  }
-
-  if (initializing) {
-    await initializing;
-    return;
-  }
-
-  initializing = (async () => {
-    mcpClient = new MultiServerMCPClient({
-      mcpServers: {
-        ebird: {
-          transport: "http",
-          url: mcpUrl,
-        },
-      },
-    });
-
-    const tools = await mcpClient.getTools();
-
-    ebirdTool = tools.find(
-      (t) => t.name === "ebird_species_search"
-    );
-
-    imageTool = tools.find(
-      (t) => t.name === "ebird_images"
-    );
-
-    recordingTool = tools.find(
-      (t) => t.name === "xeno_recordings"
-    );
-
-    if (!ebirdTool)
-      throw new Error("ebird_species_search tool not found");
-
-    if (!imageTool)
-      throw new Error("ebird_images tool not found");
-
-    if (!recordingTool)
-      throw new Error("xeno_recordings tool not found");
-  })();
-
-  try {
-    await initializing;
-  } finally {
-    initializing = null;
-  }
-}
-
-function shuffle<T>(arr: T[]) {
-  return [...arr].sort(() => Math.random() - 0.5);
-}
 
 function buildObservationQuiz(data: string) {
   return `
@@ -107,6 +42,29 @@ C)
 D)
 Answer: X
 `;
+}
+
+async function generateObservationsQuiz(
+  compactData: string
+): Promise<string> {
+  try {
+    const obsMsg = await llm.invoke([
+      {
+        role: "user",
+        content: buildObservationQuiz(compactData),
+      },
+    ]);
+
+    return  typeof obsMsg === "string"
+      ? obsMsg
+      : Array.isArray(obsMsg.content)
+      ? obsMsg.content.map((c: any) => c.text ?? "").join("")
+      : obsMsg.content;
+  } catch (err) {
+    console.error("[generateObservationsQuiz error]", err);
+
+    return "";
+  }
 }
 
 function generateImageQuiz(
@@ -144,36 +102,6 @@ D) ${options[3]}
 
 Answer: ${answer}`,
   };
-}
-
-function normalizeMCP(raw: any): Observation[] {
-  if (Array.isArray(raw)) return raw;
-
-  if (typeof raw === "string") return JSON.parse(raw);
-
-  const text =
-    raw?.content?.[0]?.text ||
-    raw?.result?.content?.[0]?.text ||
-    raw?.output;
-
-  if (typeof text === "string") return JSON.parse(text);
-
-  throw new Error("Invalid MCP response format");
-}
-
-function normalizeRecording(raw: any, birdName: string) {
-  const data =
-    typeof raw === "string"
-      ? JSON.parse(raw)
-      : raw;
-
-  const recordings = data.results?.[birdName];
-
-  if (!recordings?.length) {
-    throw new Error(`No recordings found for ${birdName}`);
-  }
-
-  return recordings;
 }
 
 function generateAudioQuiz(
@@ -221,14 +149,12 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  let mcpClient: MultiServerMCPClient | undefined;
-
   try {
     const { lat, lng, dist = 25 } = req.body;
 
-    await initMcp();
+    //const { ebirdTool, imageTool, recordingTool } = await initMcp();
 
-    const raw = await ebirdTool!.invoke({
+    const raw = await searchSpecies({
       lat: Number(lat),
       lng: Number(lng),
       dist: Number(dist),
@@ -256,9 +182,7 @@ export default async function handler(
       ])
     );
 
-    const imageRaw = await imageTool!.invoke({
-      birds: imagePayload,
-    });
+    const imageRaw = await getBirdImages(imagePayload);
 
     const images =
       typeof imageRaw === "string"
@@ -268,38 +192,22 @@ export default async function handler(
     const singingBird =
       randomBirds[Math.floor(Math.random() * randomBirds.length)];
 
-    const recordingPayload = {
-      queries: [
-        {
-          name: singingBird.comName!,
-          code: singingBird.speciesCode!,
-          lat: Number(lat),
-          lon: Number(lng),
-        },
-      ],
-    };
-
-    const recordingRaw = await recordingTool!.invoke(
-      recordingPayload
-    );
-
-    const recordings = normalizeRecording(
-      recordingRaw,
-      singingBird.comName!
-    );
-
-    const obsMsg = await llm.invoke([
+    const results = await getXenoRecordings([
       {
-        role: "user",
-        content: buildObservationQuiz(compactData),
+        name: singingBird.comName!,
+        code: singingBird.speciesCode!,
+        lat: Number(lat),
+        lon: Number(lng),
       },
     ]);
 
-    const quizText =
-      typeof obsMsg === "string"
-        ? obsMsg
-        : obsMsg.content;
+    const recordings = normalizeRecording(
+      results,
+      singingBird.comName!
+    );
 
+    const quizText = await generateObservationsQuiz(compactData);
+    
     const imageQuiz = generateImageQuiz(images);
 
     const audioQuiz = generateAudioQuiz(
@@ -320,7 +228,5 @@ export default async function handler(
     return res.status(500).json({
       error: err.message,
     });
-  } finally {
-    await mcpClient?.close();
   }
 }

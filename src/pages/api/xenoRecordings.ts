@@ -110,6 +110,37 @@ const fetchXenoRecordings = async (
     }
 };
 
+export type RecordingQuery = {
+  name: string;
+  code: string;
+  lat?: number;
+  lon?: number;
+};
+
+export async function getXenoRecordings(queries: RecordingQuery[]) {
+  const out: Record<string, any[]> = {};
+
+  await Promise.all(
+    queries.map(async (q) => {
+      try {
+        const xr = await fetchXenoRecordings(
+          q.name,
+          q.code,
+          q.lat ?? 0,
+          q.lon ?? 0,
+          1
+        );
+
+        out[q.name] = Array.isArray(xr) ? xr : [];
+      } catch {
+        out[q.name] = [];
+      }
+    })
+  );
+
+  return out;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'POST') {
         res.setHeader('Allow', 'POST');
@@ -117,23 +148,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-        const queries = req.body;
-        const out: Record<string, any[]> = {};
-
-        await Promise.all(
-            queries.map(async (q: { name: string, code: string, lat?: number, lon?: number }) => {
-                try {
-                    const xr = await fetchXenoRecordings(q.name, q.code, q.lat ?? 0, q.lon ?? 0, 1);
-                    const recs = Array.isArray(xr) ? xr : [];
-                    out[q.name] = recs;
-                } catch (e) {
-                    out[q.name] = [];
-                }
-            })
-        );
+        const results = await getXenoRecordings(req.body);
 
         res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
-        return res.status(200).json({ results: out });
+        return res.status(200).json({ results });
     } catch (e) {
         console.error(e);
         return res.status(500).json({ error: 'Internal Server Error' });
