@@ -34,7 +34,13 @@ const ShareButton = ({ mapCenter, species }: { mapCenter: MapCenter; species?: s
 
     return (
         <CopyToClipboard text={getShareableLink()} onCopy={() => alert('Link copied to clipboard!')}>
-            <button>Link</button>
+            <button
+                type="button"
+                aria-label="Copy shareable link"
+                className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white sm:px-3 sm:py-2 sm:text-sm"
+            >
+                Link
+            </button>
         </CopyToClipboard>
     );
 };
