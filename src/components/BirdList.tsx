@@ -512,6 +512,8 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                 <span style={{
                                     display: 'inline-block',
                                     fontSize: '0.8rem',
+                                    color: '#000 !important',
+                                    WebkitTextFillColor: '#000',
                                     transform: filtersOpen ? 'rotate(90deg)' : 'rotate(0deg)',
                                     transition: 'transform 0.2s ease'
                                 }}>
@@ -620,11 +622,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                         {selectedGroup ===
                             'All Groups' && (
                             <h3
-                                style={{
-                                    backgroundColor:
-                                        '#f0f0f0',
-                                    padding: '8px'
-                                }}
+                                className="bg-slate-100 p-2 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                             >
                                 {groupName}
                             </h3>
@@ -669,6 +667,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                                         `/?species=${speciesCode}`
                                                     )
                                                 }
+                                                className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100"
                                                 style={{
                                                     cursor:
                                                         'pointer'

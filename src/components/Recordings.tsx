@@ -21,11 +21,7 @@ const Recordings: React.FC<Props> = ({ recordings, loading }) => {
             {recordings.map(({ name, recordings }) => (
                 <section key={name} style={{ marginBottom: 24 }}>
                     <h3
-                        style={{
-                            textTransform: "capitalize",
-                            backgroundColor: "#f0f0f0",
-                            padding: "8px"
-                        }}
+                        className="bg-slate-100 p-2 capitalize font-semibold text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                     >
                         {name}
                     </h3>
@@ -47,7 +43,7 @@ const Recordings: React.FC<Props> = ({ recordings, loading }) => {
 
                             const src =
                                 recordingAudioUrl(rec) || file || null;
-
+                            console.log('xyz', src);
                             const pageUrl =
                                 typeof r.id === "string" ||
                                 typeof r.id === "number"
@@ -82,7 +78,7 @@ const Recordings: React.FC<Props> = ({ recordings, loading }) => {
                                     >
                                         <div>
                                             <div>
-                                                <strong>{loc}</strong>
+                                                <span>{loc}</span>
                                             </div>
 
                                             <div
@@ -99,6 +95,7 @@ const Recordings: React.FC<Props> = ({ recordings, loading }) => {
                                                 href={pageUrl}
                                                 target="_blank"
                                                 rel="noreferrer"
+                                                className="text-sm"
                                             >
                                                 Open on Xeno-canto
                                             </a>

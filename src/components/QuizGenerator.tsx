@@ -53,9 +53,14 @@ const QuizGenerator: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
-      <h3>🐦 Bird Quiz</h3>
+      <h3 className="mb-4 text-xl font-semibold">🐦 Bird Quiz</h3>
 
-      <button onClick={generateQuiz} disabled={loading}>
+      <button
+        type="button"
+        onClick={generateQuiz}
+        disabled={loading}
+        className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400 dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:disabled:bg-emerald-700"
+      >
         {loading ? "Generating..." : "Generate Quiz"}
       </button>
 

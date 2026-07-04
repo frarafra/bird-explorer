@@ -1,7 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  @apply min-h-screen bg-white text-slate-900 antialiased transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100;
+}
+
+a {
+  @apply transition-colors;
+}
+
 .bird-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); 
-  gap: 16px; 
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
   align-items: start;
 }
 
@@ -11,10 +31,16 @@
   align-items: center;
   text-align: center;
   background-color: #fff;
+  color: #0f172a;
   border: none;
   border-radius: 8px;
   padding: 8px;
   box-sizing: border-box;
+}
+
+html.dark .bird-card {
+  background-color: #111827;
+  color: #f9fafb;
 }
 
 .bird-image {

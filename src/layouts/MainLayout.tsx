@@ -1,35 +1,69 @@
-import React, { FC } from 'react';
+import { FC, ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
-import styles from './MainLayout.module.css';
 
 interface MainLayoutProps {
-  children: React.ReactNode;
-  shareButton?: React.ReactNode;
+  children: ReactNode;
+  shareButton?: ReactNode;
 }
 
-const MainLayout: FC<MainLayoutProps> = ({ children, shareButton }) => (
-  <div className={styles.container}>
-    <header className={styles.header}>
-      <nav className={styles.nav}>
-        <ul className={styles.menu}>
-          <li><Link href="/">Search</Link></li>
-          <li><Link href="/birds">Birds</Link></li>
-          <li><Link href="/songbook">Songbook</Link></li>
-          <li><Link href="/quizzes">Quizzes</Link></li>
-        </ul>
-      </nav>
+const MainLayout: FC<MainLayoutProps> = ({ children, shareButton }) => {
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-      {shareButton && (
-        <div className={styles.shareButton}>
-          {shareButton}
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const shouldUseDark = savedTheme ? savedTheme === 'dark' : prefersDark;
+
+    setIsDarkMode(shouldUseDark);
+    document.documentElement.classList.toggle('dark', shouldUseDark);
+    document.documentElement.style.colorScheme = shouldUseDark ? 'dark' : 'light';
+  }, []);
+
+  const toggleTheme = () => {
+    const nextMode = !isDarkMode;
+    setIsDarkMode(nextMode);
+    document.documentElement.classList.toggle('dark', nextMode);
+    document.documentElement.style.colorScheme = nextMode ? 'dark' : 'light';
+    window.localStorage.setItem('theme', nextMode ? 'dark' : 'light');
+  };
+
+  return (
+    <div className="min-h-screen bg-white text-slate-900 transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100">
+      <header className="border-b border-slate-200 bg-[#f8f9fa] dark:border-slate-800 dark:bg-slate-900/90">
+        <div className="mx-auto flex items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
+          <nav className="flex-1 sm:w-auto">
+            <ul className="flex flex-nowrap items-center gap-3 overflow-x-auto text-sm font-medium text-slate-700 sm:gap-6 sm:text-base dark:text-slate-200">
+              <li><Link href="/" className="rounded px-2 py-1 transition hover:text-slate-900 dark:hover:text-white">Search</Link></li>
+              <li><Link href="/birds" className="rounded px-2 py-1 transition hover:text-slate-900 dark:hover:text-white">Birds</Link></li>
+              <li><Link href="/songbook" className="rounded px-2 py-1 transition hover:text-slate-900 dark:hover:text-white">Songbook</Link></li>
+              <li><Link href="/quizzes" className="rounded px-2 py-1 transition hover:text-slate-900 dark:hover:text-white">Quizzes</Link></li>
+            </ul>
+          </nav>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label="Toggle dark mode"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-sm shadow-sm transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white sm:h-10 sm:w-10 sm:text-lg"
+            >
+              {isDarkMode ? '☀️' : '🌙'}
+            </button>
+
+            {shareButton && (
+              <div className="max-w-[48px] flex-shrink-0 text-[11px] leading-tight text-center sm:max-w-none sm:text-sm">
+                {shareButton}
+              </div>
+            )}
+          </div>
         </div>
-      )}
-    </header>
+      </header>
 
-    <main className={styles.main}>
-      {children}
-    </main>
-  </div>
-);
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {children}
+      </main>
+    </div>
+  );
+};
 
 export default MainLayout;

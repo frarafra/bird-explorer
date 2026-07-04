@@ -34,7 +34,7 @@ const ShareButton = ({ mapCenter, species }: { mapCenter: MapCenter; species?: s
 
     return (
         <CopyToClipboard text={getShareableLink()} onCopy={() => alert('Link copied to clipboard!')}>
-            <button>Share link</button>
+            <button>Link</button>
         </CopyToClipboard>
     );
 };
