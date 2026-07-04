@@ -131,7 +131,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
                     value={bird}
                     onChange={(e) => setBird(e.target.value)}
                     placeholder="Search for birds..."
-                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-900 sm:px-3 sm:py-2 sm:text-base"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-900 sm:px-3 sm:py-2 sm:text-sm"
                 />
                 <button
                     type="submit"
