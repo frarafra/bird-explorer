@@ -692,7 +692,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                     <button
                         onClick={loadMore}
                         disabled={isLoadingImages || (page + 1) * batchSize >= filteredBirds.length}
-                        style={{ padding: '8px 16px', cursor: isLoadingImages ? 'not-allowed' : 'pointer' }}
+                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                     >
                         {isLoadingImages ? 'Loading…' : 'Load More'}
                     </button>

@@ -200,6 +200,7 @@ const RecordingList: React.FC<Props> = ({ birds, mapCenter }) => {
                         <button
                             onClick={() => setPageRec((p) => p + 1)}
                             disabled={loading}
+                            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
                         >
                             {loading ? "Loading…" : "Load More"}
                         </button>
