@@ -43,7 +43,6 @@ const Recordings: React.FC<Props> = ({ recordings, loading }) => {
 
                             const src =
                                 recordingAudioUrl(rec) || file || null;
-                            console.log('xyz', src);
                             const pageUrl =
                                 typeof r.id === "string" ||
                                 typeof r.id === "number"
