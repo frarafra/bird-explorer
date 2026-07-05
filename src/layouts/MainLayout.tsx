@@ -45,9 +45,11 @@ const MainLayout: FC<MainLayoutProps> = ({ children, shareButton }) => {
               type="button"
               onClick={toggleTheme}
               aria-label="Toggle dark mode"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-xs shadow-sm transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white sm:h-8 sm:w-8 sm:text-sm"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-lg leading-none shadow-sm transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white sm:h-9 sm:w-9 sm:text-xl"
             >
-              {isDarkMode ? '◐' : '◑'}
+              <span className="inline-flex h-full w-full items-center justify-center leading-none -translate-y-px">
+                {isDarkMode ? '◐' : '◑'}
+              </span>
             </button>
 
             {shareButton && (
