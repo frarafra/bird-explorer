@@ -93,7 +93,7 @@ function generateImageQuiz(
 
   return {
     imageUrl: correctImage.imageUrl,
-    quiz: `Q4: Which bird is shown in this image?
+    quiz: `Q2: Which bird is shown in this image?
 
 A) ${options[0]}
 B) ${options[1]}
@@ -134,7 +134,7 @@ function generateAudioQuiz(
 
   return {
     audioUrl: recording.file,
-    quiz: `Q5: Which bird is singing in this recording?
+    quiz: `Q3: Which bird is singing in this recording?
 
 A) ${options[0]}
 B) ${options[1]}

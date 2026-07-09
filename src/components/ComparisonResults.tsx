@@ -68,62 +68,49 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ point1, point2, o
     return (
         <div
             ref={containerRef}
-            style={{
-                position: 'fixed',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                background: 'white',
-                padding: '20px',
-                borderRadius: '8px',
-                boxShadow: '0 0 10px rgba(0,0,0,0.3)',
-                zIndex: 1000,
-                maxWidth: '80%',
-                maxHeight: '80%',
-                overflow: 'auto'
-            }}
+            className="fixed left-1/2 top-1/2 z-[1000] max-h-[80%] max-w-[80%] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-lg border border-slate-200 bg-white p-5 text-slate-900 shadow-[0_0_10px_rgba(0,0,0,0.3)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         >
-            <h3>Comparison Results</h3>
-            <button onClick={onClose} style={{ float: 'right' }}>Close</button>
+            <div className="flex items-start justify-between gap-4">
+                <h3 className="text-lg font-semibold">Comparison Results</h3>
+                <button
+                    onClick={onClose}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white"
+                >
+                    Close
+                </button>
+            </div>
 
-            <div style={{ marginTop: '20px' }}>
-                <h4>Unique to {locationName1} ({uniqueToPoint1.length})</h4>
-                <ul>
+            <div className="mt-5">
+                <h4 className="text-base font-semibold">Unique to {locationName1} ({uniqueToPoint1.length})</h4>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-700 dark:text-slate-300">
                     {uniqueToPoint1.map(specie => (
                         <li key={specie}>{specie}</li>
                     ))}
                 </ul>
             </div>
 
-            <div style={{ marginTop: '20px' }}>
-                <h4>Unique to {locationName2} ({uniqueToPoint2.length})</h4>
-                <ul>
+            <div className="mt-5">
+                <h4 className="text-base font-semibold">Unique to {locationName2} ({uniqueToPoint2.length})</h4>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-700 dark:text-slate-300">
                     {uniqueToPoint2.map(specie => (
                         <li key={specie}>{specie}</li>
                     ))}
                 </ul>
             </div>
 
-            <div style={{ marginTop: '20px' }}>
-                <h4>Common Birds ({commonBirds.length})</h4>
-                <ul>
+            <div className="mt-5">
+                <h4 className="text-base font-semibold">Common Birds ({commonBirds.length})</h4>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-700 dark:text-slate-300">
                     {commonBirds.map(specie => (
                         <li key={specie}>{specie}</li>
                     ))}
                 </ul>
             </div>
 
-            <div style={{
-                textAlign: 'center',
-                marginTop: '20px',
-                paddingBottom: '10px'
-            }}>
+            <div className="mt-5 pb-2 text-center">
                 <button
                     onClick={scrollToTop}
-                    style={{
-                        padding: '8px 16px',
-                        cursor: 'pointer',
-                    }}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white"
                 >
                     Scroll to Top
                 </button>
