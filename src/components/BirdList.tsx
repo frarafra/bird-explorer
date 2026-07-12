@@ -1,4 +1,4 @@
-import React, { FC, useContext, useState, useEffect } from 'react';
+import React, { FC, useContext, useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { useQuery } from '@tanstack/react-query'
 import { BirdContext } from '../contexts/BirdContext';
@@ -51,6 +51,8 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     const [filtersOpen, setFiltersOpen] = useState(false);
 
     const batchSize = Number(process.env.NEXT_PUBLIC_BATCH_SIZE);
+    const lat = Number(process.env.NEXT_PUBLIC_LAT ?? 0);
+    const lng = Number(process.env.NEXT_PUBLIC_LNG ?? 0);
 
     const router = useRouter();
 
@@ -440,8 +442,73 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                       paginatedBirds
               };
 
+    const speciesCodesForAbundance = useMemo(() => {
+        const activeBirds = selectedGroup === 'All Groups' ? paginatedBirds : filteredBirds;
+
+        return activeBirds
+            .map(([, speciesCode]) => speciesCode)
+            .filter(Boolean);
+    }, [filteredBirds, paginatedBirds, selectedGroup]);
+
+    const { data: abundanceData } = useQuery({
+        queryKey: ['birdAbundance', selectedGroup, page, speciesCodesForAbundance, lat, lng],
+        queryFn: async () => {
+            const params = new URLSearchParams();
+            speciesCodesForAbundance.forEach((speciesCode) => {
+                params.append('species', speciesCode);
+            });
+            params.set('lat', String(lat));
+            params.set('lng', String(lng));
+
+            const response = await fetch(`/api/ebirdHowMany?${params.toString()}`);
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch abundance data');
+            }
+
+            return response.json() as Promise<{
+                birds?: Array<{
+                    speciesCode: string;
+                    total: number;
+                    rate: number;
+                }>;
+            }>;
+        },
+        enabled: speciesCodesForAbundance.length > 0,
+        staleTime: 1000 * 60 * 5,
+    });
+
+    const abundanceBySpeciesCode = useMemo(() => {
+        return (abundanceData?.birds ?? []).reduce<Record<string, { total: number; rate: number }>>(
+            (acc, bird) => {
+                acc[bird.speciesCode] = {
+                    total: bird.total,
+                    rate: bird.rate,
+                };
+                return acc;
+            },
+            {}
+        );
+    }, [abundanceData]);
+
     const filteredSortedBirds =
         filterBirdsByKeywords(sortedBirds);
+
+    const getAbundanceIcon = (rate: number) => {
+        const filledBars = Math.max(0, Math.min(3, rate));
+
+        return {
+            filledBars,
+            label:
+                rate >= 3
+                    ? 'High abundance'
+                    : rate === 2
+                      ? 'Medium abundance'
+                      : rate === 1
+                        ? 'Low abundance'
+                        : 'No abundance',
+        };
+    };
 
     const birdsToDisplay =
         sortMethod === 'default'
@@ -466,10 +533,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                     setSortedBirds(orderedBirds);
                     setFiltersOpen(false);
                 }}
-                style={{
-                    marginBottom: '16px',
-                    padding: '8px'
-                }}
+                className="mb-4 rounded border border-slate-300 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             >
                 {groups.map(group => (
                     <option
@@ -483,40 +547,16 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
 
             {selectedGroup !== 'All Groups' && (
                 <>
-                    <div style={{
-                        display: 'flex',
-                        gap: '8px',
-                        flexWrap: 'wrap',
-                        marginBottom: '16px',
-                        justifyContent: 'flex-start'
-                    }}>
+                    <div className="mb-4 flex flex-wrap items-center justify-start gap-2">
                         {Object.keys(keywordsByCategory).length > 0 && (
                             <button
                                 onClick={() => setFiltersOpen(prev => !prev)}
-                                style={{
-                                    padding: '8px 16px',
-                                    backgroundColor: filtersOpen ? '#e0e0e0' : '#f0f0f0',
-                                    color: '#000',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    gap: '8px'
-                                }}
+                                className={`flex items-center justify-between gap-2 rounded px-4 py-2 text-sm text-black transition ${filtersOpen ? 'bg-slate-200' : 'bg-slate-100'} hover:bg-slate-200`}
                             >
-                                <span style={{ fontWeight: filtersOpen ? 600 : 400 }}>
+                                <span className={filtersOpen ? 'font-semibold' : 'font-normal'}>
                                     Filters
                                 </span>
-                                <span style={{
-                                    display: 'inline-block',
-                                    fontSize: '0.8rem',
-                                    color: '#000 !important',
-                                    WebkitTextFillColor: '#000',
-                                    transform: filtersOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-                                    transition: 'transform 0.2s ease'
-                                }}>
+                                <span className={`inline-block text-xs text-black ${filtersOpen ? 'rotate-90' : 'rotate-0'} transition-transform`}>
                                     ▶
                                 </span>
                             </button>
@@ -536,14 +576,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                     }
                                 }}
                                 disabled={isProcessing}
-                                style={{
-                                    padding: '8px 16px',
-                                    backgroundColor: isProcessing ? '#ccc' : '#f0f0f0',
-                                    color: 'black',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: isProcessing ? 'not-allowed' : 'pointer'
-                                }}
+                                className={`rounded px-4 py-2 text-sm text-black transition ${isProcessing ? 'cursor-not-allowed bg-slate-300' : 'cursor-pointer bg-slate-100 hover:bg-slate-200'}`}
                             >
                                 {isProcessing ? 'Processing...' : sortMethod === 'default' ? 'Sort by Similarity' : 'Sort by Name'}
                             </button>
@@ -551,31 +584,20 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                     </div>
 
                     {Object.keys(keywordsByCategory).length > 0 && filtersOpen && (
-                        <div style={{
-                            marginBottom: '16px',
-                            border: '1px solid #e0e0e0',
-                            borderRadius: '4px',
-                            backgroundColor: '#f9f9f9',
-                            padding: '12px'
-                        }}>
+                        <div className="mb-4 rounded border border-slate-200 bg-slate-50 p-3">
                             {isLoadingKeywords ? (
-                                <div style={{ fontSize: '0.8rem', color: '#666' }}>
+                                <div className="text-sm text-slate-600">
                                     Loading filters...
                                 </div>
                             ) : (
                                 Object.entries(keywordsByCategory)
                                     .sort(([a], [b]) => a.localeCompare(b))
                                     .map(([category, keywords]) => (
-                                        <div key={category} style={{ marginBottom: '12px' }}>
-                                            <strong style={{ fontSize: '0.78rem', color: '#555' }}>
+                                        <div key={category} className="mb-3">
+                                            <strong className="text-xs text-slate-600">
                                                 {category}
                                             </strong>
-                                            <div style={{
-                                                display: 'flex',
-                                                flexWrap: 'wrap',
-                                                gap: '6px',
-                                                marginTop: '6px'
-                                            }}>
+                                            <div className="mt-2 flex flex-wrap gap-2">
                                                 {Array.from(keywords).sort().map(keyword => {
                                                     const keywordId = `${category}:${keyword}`;
                                                     const isSelected = selectedKeywords.has(keywordId);
@@ -591,15 +613,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                                                 setSortMethod('default');
                                                                 setSortedBirds(orderedBirds);
                                                             }}
-                                                            style={{
-                                                                fontSize: '0.75rem',
-                                                                padding: '3px 8px',
-                                                                borderRadius: '3px',
-                                                                cursor: 'pointer',
-                                                                backgroundColor: isSelected ? '#0277bd' : '#e8f4f8',
-                                                                color: isSelected ? '#fff' : '#0277bd',
-                                                                border: '1px solid #b3e5fc'
-                                                            }}
+                                                            className={`cursor-pointer rounded border px-2 py-1 text-xs ${isSelected ? 'border-sky-600 bg-sky-600 text-white' : 'border-sky-100 bg-sky-50 text-sky-700'}`}
                                                         >
                                                             {keyword}
                                                         </span>
@@ -661,22 +675,45 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                                 />
                                             )}
 
-                                            <span
-                                                onClick={() =>
-                                                    router.push(
-                                                        `/?species=${speciesCode}`
-                                                    )
-                                                }
-                                                className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100"
-                                                style={{
-                                                    cursor:
-                                                        'pointer'
-                                                }}
+                                            <div
+                                                className="mt-2 flex items-center gap-1 text-sm font-medium text-slate-900 dark:text-slate-100"
                                             >
-                                                {
-                                                    name
-                                                }
-                                            </span>
+                                                <span
+                                                    onClick={() =>
+                                                        router.push(
+                                                            `/?species=${speciesCode}`
+                                                        )
+                                                    }
+                                                    style={{
+                                                        cursor:
+                                                            'pointer'
+                                                    }}
+                                                >
+                                                    {
+                                                        name
+                                                    }
+                                                </span>
+
+                                                {(() => {
+                                                    const abundance = abundanceBySpeciesCode[speciesCode];
+                                                    const iconData = abundance ? getAbundanceIcon(abundance.rate) : null;
+
+                                                    return iconData ? (
+                                                        <span
+                                                            title={iconData.label}
+                                                            aria-label={iconData.label}
+                                                            className="ml-1 flex items-end gap-1"
+                                                        >
+                                                            {Array.from({ length: 3 }).map((_, index) => (
+                                                                <span
+                                                                    key={index}
+                                                                    className={`inline-block h-2 w-2 rounded-sm ${index < iconData.filledBars ? 'bg-slate-900 dark:bg-slate-300' : 'bg-slate-300 dark:bg-slate-900'}`}
+                                                                />
+                                                            ))}
+                                                        </span>
+                                                    ) : null;
+                                                })()}
+                                            </div>
                                         </div>
                                     )
                                 )}
@@ -688,7 +725,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
             {isLoadingImages && <p>Loading...</p>}
 
             {selectedGroup === 'All Groups' && filteredBirds.length > (page + 1) * batchSize && (
-                <div style={{ textAlign: 'center', marginTop: 12 }}>
+                <div className="mt-3 text-center">
                     <button
                         onClick={loadMore}
                         disabled={isLoadingImages || (page + 1) * batchSize >= filteredBirds.length}
