@@ -10,31 +10,26 @@ function delay(ms: number) {
 }
 
 function getAbundanceRange(total: number, maxTotal: number) {
-  if (maxTotal <= 0) {
-    return { rate: 0, range: { min: 0, max: 0 } };
+  if (total <= 0 || maxTotal <= 0) {
+    return {
+      rate: 0,
+      range: { min: 0, max: 0 },
+    };
   }
 
-  if (total <= 0) {
-    return { rate: 0, range: { min: 0, max: 0 } };
-  }
+  const scaled = Math.sqrt(total / maxTotal);
+  const rate = Math.min(4, Math.max(1, Math.ceil(scaled * 4)));
 
-  const bucketSize = Math.max(1, Math.ceil(maxTotal / 3));
-
-  if (total <= bucketSize) {
-    return { rate: 1, range: { min: 1, max: bucketSize } };
-  }
-
-  if (total <= bucketSize * 2) {
-    return { rate: 2, range: { min: bucketSize + 1, max: bucketSize * 2 } };
-  }
-
-  return { rate: 3, range: { min: bucketSize * 2 + 1, max: maxTotal } };
+  return { rate };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const speciesCodes = Array.isArray(req.query.species)
-    ? req.query.species.filter((item): item is string => typeof item === 'string')
-    : [];
+  const speciesParam = req.query.species;
+  const speciesCodes = typeof speciesParam === 'string'
+    ? speciesParam.split(',').map(s => s.trim()).filter(Boolean)
+    : Array.isArray(speciesParam)
+      ? speciesParam.filter((item): item is string => typeof item === 'string')
+      : [];
 
   if (speciesCodes.length === 0) {
     return res.status(400).json({ error: 'Missing bird species codes' });
@@ -113,9 +108,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(200).json({
       birds: freqBirds,
       abundanceRanges: [
-        { rate: 1, range: { min: 1, max: Math.max(1, Math.ceil(maxTotal / 3)) } },
-        { rate: 2, range: { min: Math.max(1, Math.ceil(maxTotal / 3) + 1), max: Math.max(1, Math.ceil((maxTotal * 2) / 3)) } },
-        { rate: 3, range: { min: Math.max(1, Math.ceil((maxTotal * 2) / 3) + 1), max: maxTotal } },
+        { rate: 1, range: { min: 1, max: Math.max(1, Math.ceil(maxTotal / 4)) } },
+        { rate: 2, range: { min: Math.max(1, Math.ceil(maxTotal / 4) + 1), max: Math.max(1, Math.ceil((maxTotal * 2) / 4)) } },
+        { rate: 3, range: { min: Math.max(1, Math.ceil((maxTotal * 2) / 4) + 1), max: Math.max(1, Math.ceil((maxTotal * 3) / 4)) } },
+        { rate: 4, range: { min: Math.max(1, Math.ceil((maxTotal * 3) / 4) + 1), max: maxTotal } },
       ],
     });
   } catch (error) {

@@ -454,9 +454,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         queryKey: ['birdAbundance', selectedGroup, page, speciesCodesForAbundance, lat, lng],
         queryFn: async () => {
             const params = new URLSearchParams();
-            speciesCodesForAbundance.forEach((speciesCode) => {
-                params.append('species', speciesCode);
-            });
+            params.set('species', speciesCodesForAbundance.join(','));
             params.set('lat', String(lat));
             params.set('lng', String(lng));
 
@@ -495,18 +493,20 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         filterBirdsByKeywords(sortedBirds);
 
     const getAbundanceIcon = (rate: number) => {
-        const filledBars = Math.max(0, Math.min(3, rate));
+        const filledBars = Math.max(0, Math.min(4, rate));
 
         return {
             filledBars,
             label:
-                rate >= 3
-                    ? 'High abundance'
-                    : rate === 2
-                      ? 'Medium abundance'
-                      : rate === 1
-                        ? 'Low abundance'
-                        : 'No abundance',
+                rate === 4
+                    ? 'Very high abundance'
+                    : rate === 3
+                      ? 'High abundance'
+                      : rate === 2
+                        ? 'Medium abundance'
+                        : rate === 1
+                          ? 'Low abundance'
+                          : 'No abundance',
         };
     };
 
@@ -704,7 +704,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                                             aria-label={iconData.label}
                                                             className="ml-1 flex items-end gap-1"
                                                         >
-                                                            {Array.from({ length: 3 }).map((_, index) => (
+                                                            {Array.from({ length: 4 }).map((_, index) => (
                                                                 <span
                                                                     key={index}
                                                                     className={`inline-block h-2 w-2 rounded-sm ${index < iconData.filledBars ? 'bg-slate-900 dark:bg-slate-300' : 'bg-slate-300 dark:bg-slate-900'}`}
