@@ -472,7 +472,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                 }>;
             }>;
         },
-        enabled: selectedGroup !== 'All Groups' && speciesCodesForAbundance.length > 1,
+        enabled: selectedGroup !== 'All Groups',
         staleTime: 1000 * 60 * 5,
     });
 
