@@ -17,19 +17,19 @@ function getAbundanceRange(total: number) {
     };
   }
 
-  if (total <= 20) {
-    return { rate: 1, range: { min: 1, max: 20 } };
+  if (total <= 200) {
+    return { rate: 1, range: { min: 1, max: 200 } };
   }
 
-  if (total <= 100) {
-    return { rate: 2, range: { min: 21, max: 100 } };
+  if (total <= 1000) {
+    return { rate: 2, range: { min: 201, max: 1000 } };
   }
 
-  if (total <= 500) {
-    return { rate: 3, range: { min: 101, max: 500 } };
+  if (total <= 5000) {
+    return { rate: 3, range: { min: 1001, max: 5000 } };
   }
 
-  return { rate: 4, range: { min: 501, max: Infinity } };
+  return { rate: 4, range: { min: 5001, max: Infinity } };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
