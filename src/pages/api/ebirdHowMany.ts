@@ -9,18 +9,27 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function getAbundanceRange(total: number, maxTotal: number) {
-  if (total <= 0 || maxTotal <= 0) {
+function getAbundanceRange(total: number) {
+  if (total <= 0) {
     return {
       rate: 0,
       range: { min: 0, max: 0 },
     };
   }
 
-  const scaled = Math.sqrt(total / maxTotal);
-  const rate = Math.min(4, Math.max(1, Math.ceil(scaled * 4)));
+  if (total <= 20) {
+    return { rate: 1, range: { min: 1, max: 20 } };
+  }
 
-  return { rate };
+  if (total <= 100) {
+    return { rate: 2, range: { min: 21, max: 100 } };
+  }
+
+  if (total <= 500) {
+    return { rate: 3, range: { min: 101, max: 500 } };
+  }
+
+  return { rate: 4, range: { min: 501, max: Infinity } };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -94,10 +103,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     });
 
-    const maxTotal = birds.reduce((max, bird) => Math.max(max, bird.total), 0);
-
     const freqBirds = birds.map((bird) => {
-      const abundance = getAbundanceRange(bird.total, maxTotal);
+      const abundance = getAbundanceRange(bird.total);
 
       return {
         ...bird,
@@ -108,10 +115,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(200).json({
       birds: freqBirds,
       abundanceRanges: [
-        { rate: 1, range: { min: 1, max: Math.max(1, Math.ceil(maxTotal / 4)) } },
-        { rate: 2, range: { min: Math.max(1, Math.ceil(maxTotal / 4) + 1), max: Math.max(1, Math.ceil((maxTotal * 2) / 4)) } },
-        { rate: 3, range: { min: Math.max(1, Math.ceil((maxTotal * 2) / 4) + 1), max: Math.max(1, Math.ceil((maxTotal * 3) / 4)) } },
-        { rate: 4, range: { min: Math.max(1, Math.ceil((maxTotal * 3) / 4) + 1), max: maxTotal } },
+        { rate: 1, range: { min: 1, max: 20 } },
+        { rate: 2, range: { min: 21, max: 100 } },
+        { rate: 3, range: { min: 101, max: 500 } },
+        { rate: 4, range: { min: 501, max: Infinity } },
       ],
     });
   } catch (error) {
