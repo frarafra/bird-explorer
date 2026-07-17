@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
 import Leaflet from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -15,6 +15,19 @@ interface MapProps {
     results: Result[];
     hoveredResultId: number | null;
     onMoveEnd: (newCenter: {lat: number, lng: number}) => void; 
+}
+
+interface Hotspot {
+  locId: string;
+  locName: string;
+  lat: number;
+  lng: number;
+  latestObsDt: string;
+}
+
+interface MapEventsHandlerProps {
+  onMoveEnd: (newCenter: { lat: number; lng: number }) => void;
+  onHotspotsChanged: (hotspots: Hotspot[]) => void;
 }
 
 const mapIcon = new Leaflet.Icon({
@@ -45,25 +58,105 @@ const MapClickHandler = ({ onLocationSelected }: { onLocationSelected: (lat: num
   return null;
 };
 
-const MapEventsHandler = ({ onMoveEnd }: { onMoveEnd: (newCenter: { lat: number, lng: number }) => void }) => {
+const MapEventsHandler = ({ onMoveEnd, onHotspotsChanged }: MapEventsHandlerProps) => {
   const map = useMap();
 
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const lastFetchRef = useRef<{
+    lat: number;
+    lng: number;
+    zoom: number;
+  } | null>(null);
+
   useEffect(() => {
-    const handleMoveEnd = () => {
+    const fetchHotspots = async () => {
       const center = map.getCenter();
-      onMoveEnd({ lat: center.lat, lng: center.lng });
-    };
+      const zoom = map.getZoom();
 
-    if (map) {
-      map.on('moveend', handleMoveEnd);
-    }
+      onMoveEnd({
+        lat: center.lat,
+        lng: center.lng,
+      });
 
-    return () => {
-      if (map) {
-        map.off('moveend', handleMoveEnd);
+      if (lastFetchRef.current) {
+        const movedLat = Math.abs(center.lat - lastFetchRef.current.lat);
+        const movedLng = Math.abs(center.lng - lastFetchRef.current.lng);
+
+        const movedEnough = movedLat > 0.02 || movedLng > 0.02;
+        const zoomChanged = zoom !== lastFetchRef.current.zoom;
+
+        if (!movedEnough && !zoomChanged) {
+          return;
+        }
+      }
+
+      lastFetchRef.current = {
+        lat: center.lat,
+        lng: center.lng,
+        zoom,
+      };
+
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
+
+      try {
+        const bounds = map.getBounds();
+        const north = bounds.getNorth();
+
+        const dist = Math.max(
+          5,
+          Math.ceil(Math.abs(north - center.lat) * 111)
+        );
+        
+        if (dist > 50) {
+          onHotspotsChanged([]);
+          return;
+        }
+
+        const response = await fetch(
+          `/api/ebirdHotspots?lat=${center.lat}&lng=${center.lng}&dist=${dist}`,
+          {
+            signal: abortRef.current.signal,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch hotspots");
+        }
+
+        const hotspots: Hotspot[] = await response.json();
+        onHotspotsChanged([...hotspots.filter(h => h.latestObsDt !== null)]);
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          console.error("Error loading hotspots:", err);
+        }
       }
     };
-  }, [map, onMoveEnd]);
+
+    const handleMoveEnd = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      timeoutRef.current = setTimeout(fetchHotspots, 500);
+    };
+
+    fetchHotspots();
+
+    map.on("moveend", handleMoveEnd);
+
+    return () => {
+      map.off("moveend", handleMoveEnd);
+
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      abortRef.current?.abort();
+    };
+  }, [map, onMoveEnd, onHotspotsChanged]);
 
   return null;
 };
@@ -98,6 +191,7 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId,
   const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [bounds, setBounds] = useState<[[number, number], [number, number]] | null>(null);
+  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
 
   useEffect(() => {
     const checkIfMobile = () => {
@@ -172,7 +266,7 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId,
                   </Marker>
               ))}
 
-              <MapEventsHandler onMoveEnd={onMoveEnd} />
+              <MapEventsHandler onMoveEnd={onMoveEnd} onHotspotsChanged={setHotspots} />
 
               {point1 && (
                   <Marker
@@ -191,6 +285,24 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId,
                       <Popup>Point 2: {point2.species ? `${point2.species.length} species` : 'Loading...'}</Popup>
                   </Marker>
               )}
+
+              {hotspots.map((hotspot) => (
+                <CircleMarker
+                  key={hotspot.locId}
+                  center={[hotspot.lat, hotspot.lng]}
+                  radius={6}
+                  pathOptions={{
+                    color: "#d21f19",
+                    fillColor: "#f59342",
+                    fillOpacity: 0.6,
+                    weight: 1,
+                  }}
+                >
+                  <Popup>
+                    <strong>{hotspot.locName}</strong>
+                  </Popup>
+                </CircleMarker>
+              ))}
 
               {compareMode && <MapClickHandler onLocationSelected={handleLocationSelected} />}
           </MapContainer>
