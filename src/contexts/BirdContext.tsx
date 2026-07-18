@@ -30,6 +30,12 @@ interface BirdContextType {
     mapCenter: MapCenter;
     setMapCenter: React.Dispatch<React.SetStateAction<MapCenter>>;
 
+    mapZoom: number;
+    setMapZoom: React.Dispatch<React.SetStateAction<number>>;
+        
+    mapDist: number;
+    setMapDist: React.Dispatch<React.SetStateAction<number>>;
+
     taxonomies: Record<string, string>;
     setTaxonomies: React.Dispatch<
         React.SetStateAction<Record<string, string>>
@@ -69,6 +75,12 @@ export const BirdContext = createContext<BirdContextType>({
         lng: parseFloat(process.env.NEXT_PUBLIC_LNG || '0')
     },
     setMapCenter: () => {},
+
+    mapZoom: 10,
+    setMapZoom: () => {},
+
+    mapDist: 25,
+    setMapDist: () => {},
 
     page: 0,
     setPage: () => {},
@@ -124,6 +136,10 @@ export const BirdProvider: FC<BirdProviderProps> = ({
         )
     });
 
+    const [mapZoom, setMapZoom] = useState<number>(10);
+
+    const [mapDist, setMapDist] = useState<number>(25);
+
     const [page, setPage] = useState(0);
 
     const [pageRec, setPageRec] = useState(0);
@@ -158,6 +174,12 @@ export const BirdProvider: FC<BirdProviderProps> = ({
 
                 mapCenter,
                 setMapCenter,
+
+                mapZoom,
+                setMapZoom,     
+
+                mapDist,
+                setMapDist,
 
                 page,
                 setPage,

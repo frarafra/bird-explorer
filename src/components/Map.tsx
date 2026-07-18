@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
 import Leaflet from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -7,6 +7,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import ComparisonResults from './ComparisonResults';
 import { Result } from '../types';
 import { calculateBounds } from '../utils/mapUtils';
+import { BirdContext } from '../contexts/BirdContext';
 
 interface MapProps {
     extended: boolean;
@@ -14,7 +15,6 @@ interface MapProps {
     lng: number;
     results: Result[];
     hoveredResultId: number | null;
-    onMoveEnd: (newCenter: {lat: number, lng: number}) => void; 
 }
 
 interface Hotspot {
@@ -28,6 +28,8 @@ interface Hotspot {
 interface MapEventsHandlerProps {
   onMoveEnd: (newCenter: { lat: number; lng: number }) => void;
   onHotspotsChanged: (hotspots: Hotspot[]) => void;
+  setMapDist: (dist: number) => void;
+  setMapZoom: (zoom: number) => void;
 }
 
 const mapIcon = new Leaflet.Icon({
@@ -58,7 +60,7 @@ const MapClickHandler = ({ onLocationSelected }: { onLocationSelected: (lat: num
   return null;
 };
 
-const MapEventsHandler = ({ onMoveEnd, onHotspotsChanged }: MapEventsHandlerProps) => {
+const MapEventsHandler = ({ onMoveEnd, onHotspotsChanged, setMapDist, setMapZoom }: MapEventsHandlerProps) => {
   const map = useMap();
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -74,11 +76,26 @@ const MapEventsHandler = ({ onMoveEnd, onHotspotsChanged }: MapEventsHandlerProp
     const fetchHotspots = async () => {
       const center = map.getCenter();
       const zoom = map.getZoom();
+      const bounds = map.getBounds();
+      const north = bounds.getNorth();
+
+      const dist = Math.max(
+        5,
+        Math.ceil(Math.abs(north - center.lat) * 111)
+      );
 
       onMoveEnd({
         lat: center.lat,
         lng: center.lng,
       });
+
+      setMapZoom(zoom);
+      setMapDist(dist > 50 ? 50 : dist);
+
+      if (dist > 50) {
+        onHotspotsChanged([]);
+        return;
+      }
 
       if (lastFetchRef.current) {
         const movedLat = Math.abs(center.lat - lastFetchRef.current.lat);
@@ -102,19 +119,6 @@ const MapEventsHandler = ({ onMoveEnd, onHotspotsChanged }: MapEventsHandlerProp
       abortRef.current = new AbortController();
 
       try {
-        const bounds = map.getBounds();
-        const north = bounds.getNorth();
-
-        const dist = Math.max(
-          5,
-          Math.ceil(Math.abs(north - center.lat) * 111)
-        );
-        
-        if (dist > 50) {
-          onHotspotsChanged([]);
-          return;
-        }
-
         const response = await fetch(
           `/api/ebirdHotspots?lat=${center.lat}&lng=${center.lng}&dist=${dist}`,
           {
@@ -183,7 +187,8 @@ const FitBounds = ({ bounds }: { bounds: [[number, number], [number, number]] | 
   return null;
 };
   
-const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId, onMoveEnd }) => {
+const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId }) => {
+  const { setMapCenter, setMapDist, mapZoom, setMapZoom } = useContext(BirdContext);
   const [compareMode, setCompareMode] = useState(false);
   const [point1, setPoint1] = useState<{lat: number, lng: number, species: string[]} | null>(null);
   const [point2, setPoint2] = useState<{lat: number, lng: number, species: string[]} | null>(null);
@@ -244,7 +249,7 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId,
   return (
       <div style={{ position: 'relative', height: '100vh', width: '100%' }}>
           <MapContainer
-              {...(!extended ? { center: [lat, lng], zoom: 10 } : {})}
+              {...(!extended ? { center: [lat, lng], zoom: mapZoom } : {})}
               style={{ height: "100%", width: "100%" }}
           >
               <TileLayer
@@ -266,7 +271,7 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId,
                   </Marker>
               ))}
 
-              <MapEventsHandler onMoveEnd={onMoveEnd} onHotspotsChanged={setHotspots} />
+              <MapEventsHandler onMoveEnd={setMapCenter} onHotspotsChanged={setHotspots} setMapDist={setMapDist} setMapZoom={setMapZoom} />
 
               {point1 && (
                   <Marker

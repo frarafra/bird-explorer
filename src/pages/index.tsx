@@ -49,15 +49,15 @@ const HomePage = () => {
     const router = useRouter();
     const { lat: latParam, lng: lngParam, species, extended } = router.query;
 
-    const { birds, setBirds, observations, setObservations, mapCenter, setMapCenter, setTaxonomies } = useContext(BirdContext);
+    const { birds, setBirds, observations, setObservations, mapCenter, setMapCenter, mapDist, setMapDist, setMapZoom, setTaxonomies } = useContext(BirdContext);
     const [hoveredResultId, setHoveredResultId] = useState<number | null>(null);
     const isInitialMount = useRef(true);
 
     const { lat, lng } = mapCenter;
     
-    const fetchBirds = async (newLat?: string, newLng?: string) => {
+    const fetchBirds = async (newLat?: string, newLng?: string, dist?: number) => {
         try {
-            const response = await fetch(`/api/ebirdSpeciesSearch?lat=${newLat}&lng=${newLng}&_=${new Date().getTime()}`);
+            const response = await fetch(`/api/ebirdSpeciesSearch?lat=${newLat}&lng=${newLng}&dist=${dist}&_=${new Date().getTime()}`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch birds: ${response.statusText}`);
             }
@@ -115,6 +115,8 @@ const HomePage = () => {
             const parsedLat = parseFloat(lat);
             const parsedLng = parseFloat(lng);
             setMapCenter({ lat: parsedLat, lng: parsedLng });
+            setMapDist(25);
+            setMapZoom(10);
         }
     };
 
@@ -123,8 +125,8 @@ const HomePage = () => {
     }, [latParam, lngParam]);
 
     useEffect(() => {
-        fetchBirds(lat.toString(), lng.toString());  
-    }, [lat, lng]);
+        fetchBirds(lat.toString(), lng.toString(), mapDist);  
+    }, [lat, lng, mapDist]);
 
     useEffect(() => {
         if (isInitialMount.current) { 
@@ -156,7 +158,7 @@ const HomePage = () => {
                     })} setHoveredResultId={setHoveredResultId} />
                 </div>
                 <div style={{ flex: 3, position: 'relative', height: '100vh' }}>
-                    <Map extended={extended === 'true'} lat={mapCenter.lat} lng={mapCenter.lng} results={observations} hoveredResultId={hoveredResultId} onMoveEnd={setMapCenter} />
+                    <Map extended={extended === 'true'} lat={mapCenter.lat} lng={mapCenter.lng} results={observations} hoveredResultId={hoveredResultId}  />
                 </div>
             </div>
         </MainLayout>
