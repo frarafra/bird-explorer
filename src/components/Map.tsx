@@ -10,6 +10,7 @@ import { calculateBounds } from '../utils/mapUtils';
 import { BirdContext } from '../contexts/BirdContext';
 import useMapState from './hooks/useMapState';
 import useHotspots from './hooks/useHotspots';
+import { Hotspot } from '../types';
 
 interface MapProps {
     extended: boolean;
