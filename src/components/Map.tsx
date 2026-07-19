@@ -5,9 +5,11 @@ import 'leaflet/dist/leaflet.css';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 
 import ComparisonResults from './ComparisonResults';
-import { Result } from '../types';
+import { MapEventsHandlerProps, Result } from '../types';
 import { calculateBounds } from '../utils/mapUtils';
 import { BirdContext } from '../contexts/BirdContext';
+import useMapState from './hooks/useMapState';
+import useHotspots from './hooks/useHotspots';
 
 interface MapProps {
     extended: boolean;
@@ -15,21 +17,6 @@ interface MapProps {
     lng: number;
     results: Result[];
     hoveredResultId: number | null;
-}
-
-interface Hotspot {
-  locId: string;
-  locName: string;
-  lat: number;
-  lng: number;
-  latestObsDt: string;
-}
-
-interface MapEventsHandlerProps {
-  onMoveEnd: (newCenter: { lat: number; lng: number }) => void;
-  onHotspotsChanged: (hotspots: Hotspot[]) => void;
-  setMapDist: (dist: number) => void;
-  setMapZoom: (zoom: number) => void;
 }
 
 const mapIcon = new Leaflet.Icon({
@@ -60,83 +47,29 @@ const MapClickHandler = ({ onLocationSelected }: { onLocationSelected: (lat: num
   return null;
 };
 
-const MapEventsHandler = ({ onMoveEnd, onHotspotsChanged, setMapDist, setMapZoom }: MapEventsHandlerProps) => {
+const MapEventsHandler = ({
+  onMoveEnd,
+  onHotspotsChanged,
+  setMapDist,
+  setMapZoom,
+}: MapEventsHandlerProps) => {
   const map = useMap();
 
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout>(null);
 
-  const lastFetchRef = useRef<{
-    lat: number;
-    lng: number;
-    zoom: number;
-  } | null>(null);
+  const getMapState = useMapState(
+    map,
+    onMoveEnd,
+    setMapDist,
+    setMapZoom
+  );
+
+  const fetchHotspots = useHotspots(onHotspotsChanged);
 
   useEffect(() => {
-    const fetchHotspots = async () => {
-      const center = map.getCenter();
-      const zoom = map.getZoom();
-      const bounds = map.getBounds();
-      const north = bounds.getNorth();
-
-      const dist = Math.max(
-        5,
-        Math.ceil(Math.abs(north - center.lat) * 111)
-      );
-
-      onMoveEnd({
-        lat: center.lat,
-        lng: center.lng,
-      });
-
-      setMapZoom(zoom);
-      setMapDist(dist > 50 ? 50 : dist);
-
-      if (dist > 50) {
-        onHotspotsChanged([]);
-        return;
-      }
-
-      if (lastFetchRef.current) {
-        const movedLat = Math.abs(center.lat - lastFetchRef.current.lat);
-        const movedLng = Math.abs(center.lng - lastFetchRef.current.lng);
-
-        const movedEnough = movedLat > 0.02 || movedLng > 0.02;
-        const zoomChanged = zoom !== lastFetchRef.current.zoom;
-
-        if (!movedEnough && !zoomChanged) {
-          return;
-        }
-      }
-
-      lastFetchRef.current = {
-        lat: center.lat,
-        lng: center.lng,
-        zoom,
-      };
-
-      abortRef.current?.abort();
-      abortRef.current = new AbortController();
-
-      try {
-        const response = await fetch(
-          `/api/ebirdHotspots?lat=${center.lat}&lng=${center.lng}&dist=${dist}`,
-          {
-            signal: abortRef.current.signal,
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch hotspots");
-        }
-
-        const hotspots: Hotspot[] = await response.json();
-        onHotspotsChanged([...hotspots.filter(h => h.latestObsDt !== null)]);
-      } catch (err: any) {
-        if (err.name !== "AbortError") {
-          console.error("Error loading hotspots:", err);
-        }
-      }
+    const update = () => {
+      const { center, zoom, dist } = getMapState();
+      fetchHotspots(center, zoom, dist);
     };
 
     const handleMoveEnd = () => {
@@ -144,23 +77,20 @@ const MapEventsHandler = ({ onMoveEnd, onHotspotsChanged, setMapDist, setMapZoom
         clearTimeout(timeoutRef.current);
       }
 
-      timeoutRef.current = setTimeout(fetchHotspots, 500);
+      timeoutRef.current = setTimeout(update, 500);
     };
 
-    fetchHotspots();
+    update();
 
     map.on("moveend", handleMoveEnd);
 
     return () => {
       map.off("moveend", handleMoveEnd);
-
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-
-      abortRef.current?.abort();
     };
-  }, [map, onMoveEnd, onHotspotsChanged]);
+  }, [map, getMapState, fetchHotspots]);
 
   return null;
 };

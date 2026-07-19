@@ -22,3 +22,18 @@ export type Observation = {
   howMany?: number;
   speciesCode?: string;
 };
+
+export interface Hotspot {
+  locId: string;
+  locName: string;
+  lat: number;
+  lng: number;
+  latestObsDt: string;
+}
+
+export interface MapEventsHandlerProps {
+  onMoveEnd: (newCenter: { lat: number; lng: number }) => void;
+  onHotspotsChanged: (hotspots: Hotspot[]) => void;
+  setMapDist: (dist: number) => void;
+  setMapZoom: (zoom: number) => void;
+}
