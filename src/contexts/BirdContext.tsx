@@ -152,7 +152,7 @@ export const BirdProvider: FC<BirdProviderProps> = ({
         setBirdImages({});
 
         setRecordings({});
-    }, [mapCenter]);
+    }, [mapCenter.lat, mapCenter.lng]);
 
     return (
         <BirdContext.Provider
