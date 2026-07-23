@@ -67,6 +67,79 @@ async function generateObservationsQuiz(
   }
 }
 
+function generateObservationsFallbackQuiz(
+  birds: Observation[]
+) {
+  const valid = birds.filter(
+    (b) =>
+      b.comName &&
+      b.locName
+  );
+
+  if (valid.length < 4) {
+    throw new Error("Not enough observations");
+  }
+
+  const bird = valid[Math.floor(Math.random() * valid.length)];
+
+  const useLocationQuestion = Math.random() < 0.5;
+
+  if (useLocationQuestion) {
+    const distractors = shuffle(
+      valid.filter((b) => b.locName !== bird.locName)
+    ).slice(0, 3);
+
+    const options = shuffle([
+      bird.locName!,
+      ...distractors.map(
+        (b) => b.locName!
+      ),
+    ]);
+
+    const answer =
+      ["A", "B", "C", "D"][
+        options.indexOf(bird.locName!)
+      ];
+
+    return `Q1: Where was the ${bird.comName} observed on ${bird.obsDt}?
+
+A) ${options[0]}
+B) ${options[1]}
+C) ${options[2]}
+D) ${options[3]}
+
+Answer: ${answer}`;
+  }
+
+  const distractors = shuffle(
+    valid.filter(
+      (b) =>
+        b.comName !== bird.comName
+    )
+  ).slice(0, 3);
+
+  const options = shuffle([
+    bird.comName!,
+    ...distractors.map(
+      (b) => b.comName!
+    ),
+  ]);
+
+  const answer =
+    ["A", "B", "C", "D"][
+      options.indexOf(bird.comName!)
+    ];
+
+  return `Q1: Which bird was observed at ${bird.locName} on ${bird.obsDt}?
+
+A) ${options[0]}
+B) ${options[1]}
+C) ${options[2]}
+D) ${options[3]}
+
+Answer: ${answer}`;
+}
+
 function generateImageQuiz(
   images: { name: string; imageUrl: string }[]
 ) {
@@ -115,6 +188,10 @@ function generateAudioQuiz(
 
   const recording =
     recordings[Math.floor(Math.random() * recordings.length)];
+
+  if (!recording?.file) {
+    return {}
+  }
 
   const wrongBirds = shuffle(
     randomBirds
@@ -206,7 +283,10 @@ export default async function handler(
       singingBird.comName!
     );
 
-    const quizText = await generateObservationsQuiz(compactData);
+    let quizText = await generateObservationsQuiz(compactData);
+    if  (!quizText) {
+      quizText = generateObservationsFallbackQuiz(randomBirds);
+    }
     
     const imageQuiz = generateImageQuiz(images);
 

@@ -4,7 +4,7 @@ import React, { useContext, useState } from "react";
 import { BirdContext } from "../contexts/BirdContext";
 
 const QuizGenerator: React.FC = () => {
-  const { mapCenter } = useContext(BirdContext);
+  const { mapCenter, mapDist } = useContext(BirdContext);
 
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +32,7 @@ const QuizGenerator: React.FC = () => {
         body: JSON.stringify({
           lat: mapCenter.lat,
           lng: mapCenter.lng,
-          dist: 25,
+          dist: mapDist,
         }),
       });
 
