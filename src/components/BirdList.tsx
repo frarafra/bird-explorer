@@ -27,9 +27,9 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     const [orderedBirds, setOrderedBirds] = useState<[string, string][]>([]);
     const [groups, setGroups] = useState<string[]>([]);
 
-    const [sortMethod, setSortMethod] = useState<'default' | 'similarity'>(
-        'default'
-    );
+    const [sortMethod, setSortMethod] = useState<
+        'name' | 'similarity' | 'abundance'
+    >('name');
 
     const [sortedBirds, setSortedBirds] = useState<[string, string][]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -492,6 +492,22 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     const filteredSortedBirds =
         filterBirdsByKeywords(sortedBirds);
 
+    const abundanceSortedBirds = useMemo(() => {
+        return [...filteredBirds].sort((a, b) => {
+            const totalA =
+                abundanceBySpeciesCode[a[1]]?.total ?? 0;
+            const totalB =
+                abundanceBySpeciesCode[b[1]]?.total ?? 0;
+
+            if (totalA !== totalB) {
+                return totalB - totalA;
+            }
+
+            // fall back to alphabetical
+            return a[0].localeCompare(b[0]);
+        });
+    }, [filteredBirds, abundanceBySpeciesCode]);
+
     const getAbundanceIcon = (rate: number) => {
         const filledBars = Math.max(0, Math.min(4, rate));
 
@@ -511,14 +527,17 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     };
 
     const birdsToDisplay =
-        sortMethod === 'default'
+        sortMethod === 'name'
             ? Object.entries(groupedBirds)
             : [
-                  [
-                      selectedGroup,
-                      filteredSortedBirds
-                  ]
-              ];
+                [
+                    selectedGroup,
+                    sortMethod === 'similarity'
+                        ? filteredSortedBirds
+                        : abundanceSortedBirds,
+                ],
+            ];
+
 
     return (
         <div>
@@ -529,7 +548,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                     const selected = e.target.value;
                     setSelectedGroup(selected);
                     setPage(0);
-                    setSortMethod('default');
+                    setSortMethod('name');
                     setSortedBirds(orderedBirds);
                     setFiltersOpen(false);
                 }}
@@ -556,30 +575,33 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                 <span className={filtersOpen ? 'font-semibold' : 'font-normal'}>
                                     Filters
                                 </span>
-                                <span className={`inline-block text-xs text-black ${filtersOpen ? 'rotate-90' : 'rotate-0'} transition-transform`}>
-                                    ▶
+                                <span
+                                    className={`inline-block text-slate-500 transition-transform duration-200 ${
+                                        filtersOpen ? 'rotate-90' : ''
+                                    }`}
+                                >
+                                    ›
                                 </span>
                             </button>
                         )}
 
-                        {filteredBirds.length > 2 && (
-                            <button
-                                onClick={() => {
-                                    if (!isProcessing) {
-                                        setSortMethod(
-                                            sortMethod === 'default' ? 'similarity' : 'default'
-                                        );
-                                        if (sortMethod === 'default') {
-                                            setSortedBirds([]);
-                                            setIsProcessing(true);
-                                        }
-                                    }
+                        {filteredBirds.length > 1 && (
+                            <select
+                                value={sortMethod}
+                                onChange={(e) => {
+                                    setSortMethod(
+                                        e.target.value as 'name' | 'similarity' | 'abundance'
+                                    );
                                 }}
                                 disabled={isProcessing}
-                                className={`rounded px-4 py-2 text-sm text-black transition ${isProcessing ? 'cursor-not-allowed bg-slate-300' : 'cursor-pointer bg-slate-100 hover:bg-slate-200'}`}
+                                className="rounded bg-slate-100 px-4 py-2 text-sm text-black transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100"
                             >
-                                {isProcessing ? 'Processing...' : sortMethod === 'default' ? 'Sort by Similarity' : 'Sort by Name'}
-                            </button>
+                                <option value="name">Sort By Name</option>
+                                <option value="abundance">Sort By Abundance</option>
+                                {filteredBirds.length > 2 && (
+                                    <option value="similarity">Sort by Similarity</option>
+                                )}
+                            </select>
                         )}
                     </div>
 
@@ -610,7 +632,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                                                     ? next.delete(keywordId)
                                                                     : next.add(keywordId);
                                                                 setSelectedKeywords(next);
-                                                                setSortMethod('default');
+                                                                setSortMethod('name');
                                                                 setSortedBirds(orderedBirds);
                                                             }}
                                                             className={`cursor-pointer rounded border px-2 py-1 text-xs ${isSelected ? 'border-sky-600 bg-sky-600 text-white' : 'border-sky-100 bg-sky-50 text-sky-700'}`}
