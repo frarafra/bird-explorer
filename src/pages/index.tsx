@@ -15,7 +15,7 @@ const Map = dynamic(() => import('../components/Map'), {
     ssr: false,
 });
 
-const ShareButton = ({ mapCenter, species }: { mapCenter: MapCenter; species?: string }) => {
+const ShareButton = ({ mapCenter, mapZoom, species }: { mapCenter: MapCenter; mapZoom: number; species?: string }) => {
     const isInitialMount = useRef(true);
 
     useEffect(() => {
@@ -27,7 +27,7 @@ const ShareButton = ({ mapCenter, species }: { mapCenter: MapCenter; species?: s
 
     const getShareableLink = () => {
         if (typeof window !== 'undefined') {
-            return `${window.location.origin}?lat=${mapCenter.lat}&lng=${mapCenter.lng}${species ? `&species=${species}` : ''}`;
+            return `${window.location.origin}?lat=${mapCenter.lat}&lng=${mapCenter.lng}&zoom=${mapZoom}${species ? `&species=${species}` : ''}`;
         }
         return '';
     };
@@ -47,9 +47,9 @@ const ShareButton = ({ mapCenter, species }: { mapCenter: MapCenter; species?: s
 
 const HomePage = () => {
     const router = useRouter();
-    const { lat: latParam, lng: lngParam, species, extended } = router.query;
+    const { lat: latParam, lng: lngParam, zoom: zoomParam, species, extended } = router.query;
 
-    const { birds, setBirds, observations, setObservations, mapCenter, setMapCenter, mapDist, setMapDist, setMapZoom, setTaxonomies } = useContext(BirdContext);
+    const { birds, setBirds, observations, setObservations, mapCenter, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setTaxonomies } = useContext(BirdContext);
     const [hoveredResultId, setHoveredResultId] = useState<number | null>(null);
     const isInitialMount = useRef(true);
 
@@ -110,19 +110,20 @@ const HomePage = () => {
         getBirdObservations(bird);
     };
 
-    const setMapCenterFromQueryParams = (lat: string | undefined, lng: string | undefined) => {
-        if (lat && lng) {
+    const setMapCenterFromQueryParams = (lat: string | undefined, lng: string | undefined, zoom: string | undefined) => {
+        if (lat && lng && zoom) {
             const parsedLat = parseFloat(lat);
             const parsedLng = parseFloat(lng);
+            const parsedZoom = parseInt(zoom, 10);
             setMapCenter({ lat: parsedLat, lng: parsedLng });
             setMapDist(25);
-            setMapZoom(10);
+            setMapZoom(parsedZoom);
         }
     };
 
     useEffect(() => {
-        setMapCenterFromQueryParams(latParam as string, lngParam as string);
-    }, [latParam, lngParam]);
+        setMapCenterFromQueryParams(latParam as string, lngParam as string, zoomParam as string);
+    }, [latParam, lngParam, zoomParam]);
 
     useEffect(() => {
         fetchBirds(lat.toString(), lng.toString(), mapDist);  
@@ -144,7 +145,7 @@ const HomePage = () => {
     }, [species]);
 
     return (
-        <MainLayout shareButton={<ShareButton mapCenter={mapCenter} species={species as string}/>}>
+        <MainLayout shareButton={<ShareButton mapCenter={mapCenter} mapZoom={mapZoom} species={species as string}/>}>
             <div style={{ display: 'flex', height: '100vh' }}>
                 <div style={{ flex: 2, paddingRight: '20px' }}>
                     <SearchBox onSearch={handleSearch} />
