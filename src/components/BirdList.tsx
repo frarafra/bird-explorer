@@ -1,13 +1,11 @@
-import React, { FC, useContext, useState, useEffect, useMemo } from 'react';
+import React, { FC, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useQuery } from '@tanstack/react-query'
 import { BirdContext } from '../contexts/BirdContext';
-import { fetchBirdsFilters } from '../utils/birdTaxonomyClient';
-
-interface BirdData {
-    name: string;
-    imageUrl: string;
-}
+import { useBirdAbundance } from './hooks/useBirdAbundance';
+import { useBirdKeywords } from './hooks/useBirdKeywords';
+import { useBirdSimilarity } from './hooks/useBirdSimilarity';
+import { useBirdImages } from './hooks/useBirdImages';
+import { useBirdTaxonomy } from './hooks/useBirdTaxonomy';
 
 interface BirdListProps {
     birds: Record<string, string>;
@@ -17,38 +15,16 @@ interface BirdListProps {
 const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     const {
         birdImages,
-        setBirdImages,
         page,
         setPage,
         selectedGroup,
         setSelectedGroup
     } = useContext(BirdContext);
 
-    const [orderedBirds, setOrderedBirds] = useState<[string, string][]>([]);
-    const [groups, setGroups] = useState<string[]>([]);
 
     const [sortMethod, setSortMethod] = useState<
         'name' | 'similarity' | 'abundance'
     >('name');
-
-    const [sortedBirds, setSortedBirds] = useState<[string, string][]>([]);
-    const [isProcessing, setIsProcessing] = useState(false);
-
-    const [keywordsByCategory, setKeywordsByCategory] = useState<
-        Record<string, Set<string>>
-    >({});
-
-    const [isLoadingKeywords, setIsLoadingKeywords] = useState(false);
-
-    const [birdKeywords, setBirdKeywords] = useState<
-        Record<string, string[]>
-    >({});
-
-    const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(
-        new Set()
-    );
-
-    const [filtersOpen, setFiltersOpen] = useState(false);
 
     const batchSize = Number(process.env.NEXT_PUBLIC_BATCH_SIZE);
     const lat = Number(process.env.NEXT_PUBLIC_LAT ?? 0);
@@ -56,353 +32,89 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
 
     const router = useRouter();
 
-    useEffect(() => {
-        const warmUpLambda = async () => {
-            try {
-                const results = await fetch('/api/ebirdSimilarImages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ birds: ['ou'], birdImages: { 'ou': process.env.NEXT_PUBLIC_EBIRD_IMAGE_URL } }),
-                });
-
-                if (!results.ok) {
-                    console.error(`Request failed with status:`, results.status, results.statusText);
-                }
-            } catch (error) {
-                console.error('Unexpected error during warm-up:', error);
-            }
-        };
-
-        warmUpLambda();
-    }, []);
-
-    const { data: imagesData, isLoading: isLoadingImages } = useQuery({
-        queryKey: [
-            'birdImages',
-            selectedGroup,
-            page,
-            orderedBirds.length,
-        ],
-        queryFn: async () => {
-            const filtered = filterBirdsByGroup(orderedBirds, selectedGroup);
-            if (filtered.length === 0) {
-                setSelectedGroup('All Groups');
-                return {};
-            }
-
-            let batch: Record<string, string>;
-            if (selectedGroup === 'All Groups') {
-                const start = page * batchSize;
-                const end = (page + 1) * batchSize;
-                batch = filtered.slice(start, end).reduce((acc, [name, code]) => {
-                    acc[name] = code;
-                    return acc;
-                }, {} as Record<string, string>);
-            } else {
-                batch = filtered.reduce((acc, [name, code]) => {
-                    acc[name] = code;
-                    return acc;
-                }, {} as Record<string, string>);
-            }
-
-            if (Object.keys(batch).length === 0) return {};
-
-            const response = await fetch('/api/ebirdImages', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(batch),
-            });
-
-            if (!response.ok) throw new Error('Failed to fetch images');
-            
-            return response.json();
-        },
-        enabled: orderedBirds.length > 0,
-        staleTime: 1000 * 60 * 5,
+    const {
+        groups,
+        orderedBirds,
+        birdsByGroup,
+        groupBirds
+    } = useBirdTaxonomy({
+        birds,
+        taxonomies,
+        selectedGroup,
+        setSelectedGroup,
     });
 
-    useEffect(() => {
-        if (selectedKeywords.size > 0) {
-            setFiltersOpen(true);
-        }
-    }, [selectedKeywords]);
+    const {
+        isLoading: isLoadingImages,
+    } = useBirdImages({
+        birds: birdsByGroup,
+        selectedGroup,
+        setSelectedGroup,
+    });
 
-    useEffect(() => {
-        if (
-            Object.keys(birds).length > 0 &&
-            Object.keys(taxonomies).length > 0
-        ) {
-            const uniqueGroups = getUniqueGroups(birds, taxonomies);
+    const {
+        filteredBirds,
+        keywordsByCategory,
+        selectedKeywords,
+        setSelectedKeywords,
+        filtersOpen,
+        setFiltersOpen,
+        isLoadingKeywords,
+        filterBirdsByKeywords,
+    } = useBirdKeywords({
+        orderedBirds,
+        selectedGroup,
+        taxonomies,
+    });
 
-            setGroups(uniqueGroups);
+    const paginatedBirds =
+        selectedGroup === 'All Groups'
+            ? filteredBirds.slice(
+                  0,
+                  (page + 1) * batchSize
+              )
+            : filteredBirds;
 
-            if (
-                !selectedGroup ||
-                !uniqueGroups.includes(selectedGroup)
-            ) {
-                setSelectedGroup('All Groups');
-            }
+    const groupedPaginatedBirds =
+        selectedGroup === 'All Groups'
+            ? groupBirds(paginatedBirds)
+            : {
+                [selectedGroup]: paginatedBirds,
+            };
 
-            const allGroups = Array.from(
-                new Set(Object.values(taxonomies))
-            ).filter(Boolean);
+    const {sortedBirds, setSortedBirds, isProcessing} = useBirdSimilarity({
+        groupedBirds: groupedPaginatedBirds,
+        birdImages,
+        sortMethod
+    });
+    
+    const filteredSortedBirds =
+        filterBirdsByKeywords(sortedBirds);
 
-            const sorted = sortBirdsByTaxonomy(
-                birds,
-                taxonomies,
-                allGroups
-            );
 
-            setOrderedBirds(sorted);
-        }
-    }, [birds, taxonomies]);
+    const {
+        abundanceBySpeciesCode,
+        abundanceSortedBirds,
+        getAbundanceIcon,
+    } = useBirdAbundance({
+        filteredBirds,
+        paginatedBirds,
+        selectedGroup,
+        lat,
+        lng,
+    });
 
-    useEffect(() => {
-        if (imagesData) {
-            setBirdImages(prev => ({
-            ...prev,
-            ...imagesData.reduce((acc: Record<string, string>, bird: BirdData) => {
-                acc[bird.name] = bird.imageUrl;
-                return acc;
-            }, {})
-            }));
-        }
-    }, [imagesData, setBirdImages]);
-
-    useEffect(() => {
-        const clusterBirds = async (
-            allBirds: [string, string][],
-            images: Record<string, string>
-        ) => {
-            try {
-                setSortedBirds([]);
-                setIsProcessing(true);
-
-                const response = await fetch(
-                    '/api/ebirdSimilarImages',
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            birds: allBirds,
-                            birdImages: images
-                        })
-                    }
-                );
-
-                if (!response.ok) {
-                    setSortedBirds(allBirds);
-                    return;
-                }
-
-                const sortedData: [string, string][] =
-                    await response.json();
-
-                setSortedBirds(sortedData);
-            } catch (err) {
-                console.error('Clustering error:', err);
-                setSortedBirds(allBirds);
-            } finally {
-                setIsProcessing(false);
-            }
-        };
-
-        if (
-            sortMethod === 'similarity' &&
-            Object.keys(groupedBirds).length > 0
-        ) {
-            const allBirds = Object.values(groupedBirds).flat();
-
-            if (allBirds.length > 0) {
-                clusterBirds(allBirds, birdImages);
-            }
-        } else {
-            setSortedBirds(orderedBirds);
-        }
-    }, [sortMethod, orderedBirds, birdImages]);
-
-    useEffect(() => {
-        const fetchAndProcessKeywords = async () => {
-            if (selectedGroup === 'All Groups') {
-                setKeywordsByCategory({});
-                setBirdKeywords({});
-                setSelectedKeywords(new Set());
-
-                return;
-            }
-
-            try {
-                setIsLoadingKeywords(true);
-
-                const groupBirds = orderedBirds
-                    .filter(
-                        ([name, speciesCode]) =>
-                            taxonomies[speciesCode] ===
-                            selectedGroup
-                    )
-                    .map(([name]) => name);
-
-                if (groupBirds.length === 0) {
-                    setKeywordsByCategory({});
-                    setBirdKeywords({});
-                    setSelectedKeywords(new Set());
-
-                    return;
-                }
-
-                const {
-                    keywordsMap,
-                    birdKeywords: fetchedBirdKeywords
-                } = await fetchBirdsFilters(groupBirds);
-
-                setKeywordsByCategory(keywordsMap);
-
-                setBirdKeywords(fetchedBirdKeywords || {});
-
-                setSelectedKeywords(new Set());
-            } catch (error) {
-                console.error(
-                    'Error fetching bird keywords:',
-                    error
-                );
-
-                setKeywordsByCategory({});
-                setBirdKeywords({});
-                setSelectedKeywords(new Set());
-            } finally {
-                setIsLoadingKeywords(false);
-            }
-        };
-
-        fetchAndProcessKeywords();
-    }, [selectedGroup, orderedBirds, taxonomies]);
-
-     const sortBirdsByTaxonomy = (
-        birds: Record<string, string>,
-        taxonomies: Record<string, string>,
-        orderedGroups: string[]
-    ) => {
-        const transformNameForSorting = (
-            name: string
-        ): string => {
-            if (!name) return '';
-
-            return name
-                .split(' ')
-                .reverse()
-                .join(', ');
-        };
-
-        return Object.entries(birds).sort(
-            ([name1, speciesCode1], [name2, speciesCode2]) => {
-                const group1 =
-                    taxonomies[speciesCode1] || '';
-
-                const group2 =
-                    taxonomies[speciesCode2] || '';
-
-                if (!group1) return 1;
-                if (!group2) return -1;
-
-                const index1 =
-                    orderedGroups.indexOf(group1);
-
-                const index2 =
-                    orderedGroups.indexOf(group2);
-
-                if (index1 !== index2) {
-                    return index1 - index2;
-                }
-
-                return transformNameForSorting(
-                    name1
-                ).localeCompare(
-                    transformNameForSorting(name2)
-                );
-            }
-        );
-    };
-
-    const getUniqueGroups = (
-        birds: Record<string, string>,
-        taxonomies: Record<string, string>
-    ) => {
-        const groups = new Set<string>();
-
-        Object.entries(birds).forEach(
-            ([name, speciesCode]) => {
-                const group = taxonomies[speciesCode];
-
-                if (group) {
-                    groups.add(group);
-                }
-            }
-        );
-
-        const sortedGroups = Array.from(groups).sort(
-            (a, b) => a.localeCompare(b)
-        );
-
-        return ['All Groups', ...sortedGroups];
-    };
-
-    const filterBirdsByGroup = (
-        birds: [string, string][],
-        group: string
-    ) => {
-        if (group === 'All Groups') return birds;
-
-        return birds.filter(
-            ([name, speciesCode]) =>
-                taxonomies[speciesCode] === group
-        );
-    };
-
-    const filterBirdsByKeywords = (
-        birds: [string, string][]
-    ): [string, string][] => {
-        if (selectedKeywords.size === 0) {
-            return birds;
-        }
-
-        return birds.filter(([name]) => {
-            const birdKeywordsList =
-                birdKeywords[name] || [];
-
-            return Array.from(
-                selectedKeywords
-            ).every(keyword =>
-                birdKeywordsList.includes(keyword)
-            );
-        });
-    };
-
-    const groupBirdsByTaxonomy = (
-        birdList: [string, string][]
-    ) => {
-        const groups: Record<
-            string,
-            [string, string][]
-        > = {};
-
-        birdList.forEach(([name, speciesCode]) => {
-            const birdGroup =
-                taxonomies[speciesCode] || 'Unknown';
-
-            if (!groups[birdGroup]) {
-                groups[birdGroup] = [];
-            }
-
-            groups[birdGroup].push([
-                name,
-                speciesCode
-            ]);
-        });
-
-        return groups;
-    };
+    const birdsToDisplay =
+        sortMethod === 'name'
+            ? Object.entries(groupedPaginatedBirds)
+            : [
+                [
+                    selectedGroup,
+                    sortMethod === 'similarity'
+                        ? filteredSortedBirds
+                        : abundanceSortedBirds,
+                ],
+            ];
 
     const loadMore = () => {
         if (
@@ -416,128 +128,6 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
             setPage(prevPage => prevPage + 1);
         }
     };
-
-    const filteredBirds = filterBirdsByKeywords(
-        filterBirdsByGroup(
-            orderedBirds,
-            selectedGroup
-        )
-    );
-
-    const paginatedBirds =
-        selectedGroup === 'All Groups'
-            ? filteredBirds.slice(
-                  0,
-                  (page + 1) * batchSize
-              )
-            : filteredBirds;
-
-    const groupedBirds =
-        selectedGroup === 'All Groups'
-            ? groupBirdsByTaxonomy(
-                  paginatedBirds
-              )
-            : {
-                  [selectedGroup]:
-                      paginatedBirds
-              };
-
-    const speciesCodesForAbundance = useMemo(() => {
-        const activeBirds = selectedGroup === 'All Groups' ? paginatedBirds : filteredBirds;
-
-        return activeBirds
-            .map(([, speciesCode]) => speciesCode)
-            .filter(Boolean);
-    }, [filteredBirds, paginatedBirds, selectedGroup]);
-
-    const { data: abundanceData } = useQuery({
-        queryKey: ['birdAbundance', selectedGroup, page, speciesCodesForAbundance, lat, lng],
-        queryFn: async () => {
-            const params = new URLSearchParams();
-            params.set('species', speciesCodesForAbundance.join(','));
-            params.set('lat', String(lat));
-            params.set('lng', String(lng));
-
-            const response = await fetch(`/api/ebirdHowMany?${params.toString()}`);
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch abundance data');
-            }
-
-            return response.json() as Promise<{
-                birds?: Array<{
-                    speciesCode: string;
-                    total: number;
-                    rate: number;
-                }>;
-            }>;
-        },
-        enabled: selectedGroup !== 'All Groups',
-        staleTime: 1000 * 60 * 5,
-    });
-
-    const abundanceBySpeciesCode = useMemo(() => {
-        return (abundanceData?.birds ?? []).reduce<Record<string, { total: number; rate: number }>>(
-            (acc, bird) => {
-                acc[bird.speciesCode] = {
-                    total: bird.total,
-                    rate: bird.rate,
-                };
-                return acc;
-            },
-            {}
-        );
-    }, [abundanceData]);
-
-    const filteredSortedBirds =
-        filterBirdsByKeywords(sortedBirds);
-
-    const abundanceSortedBirds = useMemo(() => {
-        return [...filteredBirds].sort((a, b) => {
-            const totalA =
-                abundanceBySpeciesCode[a[1]]?.total ?? 0;
-            const totalB =
-                abundanceBySpeciesCode[b[1]]?.total ?? 0;
-
-            if (totalA !== totalB) {
-                return totalB - totalA;
-            }
-
-            // fall back to alphabetical
-            return a[0].localeCompare(b[0]);
-        });
-    }, [filteredBirds, abundanceBySpeciesCode]);
-
-    const getAbundanceIcon = (rate: number) => {
-        const filledBars = Math.max(0, Math.min(4, rate));
-
-        return {
-            filledBars,
-            label:
-                rate === 4
-                    ? 'Very high abundance'
-                    : rate === 3
-                      ? 'High abundance'
-                      : rate === 2
-                        ? 'Medium abundance'
-                        : rate === 1
-                          ? 'Low abundance'
-                          : 'No abundance',
-        };
-    };
-
-    const birdsToDisplay =
-        sortMethod === 'name'
-            ? Object.entries(groupedBirds)
-            : [
-                [
-                    selectedGroup,
-                    sortMethod === 'similarity'
-                        ? filteredSortedBirds
-                        : abundanceSortedBirds,
-                ],
-            ];
-
 
     return (
         <div>
