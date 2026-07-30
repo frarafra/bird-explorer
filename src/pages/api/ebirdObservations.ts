@@ -12,7 +12,7 @@ export async function searchObservations({
   lng: number;
 }) {
   const response = await fetch(
-    `${EBIRD_API_URL}/${bird}/?lat=${lat}&lng=${lng}`,
+    `${EBIRD_API_URL}/${bird}?lat=${lat}&lng=${lng}`,
     {
       headers: {
         'X-eBirdApiToken': process.env.NEXT_PUBLIC_EBIRD_API_TOKEN || '',
