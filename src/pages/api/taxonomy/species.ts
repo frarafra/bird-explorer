@@ -4,7 +4,7 @@ import { getRedisClient } from '../../../client/redis';
 
 const redis = getRedisClient();
 
-const EBIRD_TAXONOMY_API_URL = 'https://api.ebird.org/v2/ref/taxonomy/ebird?fmt=json&version=2019&species=';
+const EBIRD_TAXONOMY_API_URL = 'https://api.ebird.org/v2/ref/taxonomy/ebird?fmt=json&species=';
 
 async function ebirdTaxonomySearch(speciesCodes: string[]) {
     const parsePromises = speciesCodes.map(async(speciesCode) => {
