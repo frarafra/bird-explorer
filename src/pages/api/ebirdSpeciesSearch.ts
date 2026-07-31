@@ -30,7 +30,7 @@ export async function searchSpecies({
   }
 
   const response = await fetch(
-    `${EBIRD_OBS_API_URL}?sort=species&lat=${lat}&lng=${lng}${
+    `${EBIRD_OBS_API_URL}?back=30&sort=species&lat=${lat}&lng=${lng}${
       dist ? `&dist=${dist}` : ""
     }`,
     {

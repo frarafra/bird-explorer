@@ -4,7 +4,7 @@ import { getRedisClient } from '../../client/redis';
 
 const redis = getRedisClient();
 
-const EBIRD_HOTSPOT_API_URL = 'https://api.ebird.org/v2/ref/hotspot/geo?fmt=json';
+const EBIRD_HOTSPOT_API_URL = 'https://api.ebird.org/v2/ref/hotspot/geo?back=30&fmt=json';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { lat, lng, dist } = req.query;
