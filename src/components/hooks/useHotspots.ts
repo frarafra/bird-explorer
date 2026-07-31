@@ -6,7 +6,6 @@ const useHotspots = (
   onHotspotsChanged: MapEventsHandlerProps["onHotspotsChanged"]
 ) => {
   const abortRef = useRef<AbortController | null>(null);
-  const requestIdRef = useRef(0);
 
   const lastFetchRef = useRef<{
     lat: number;
@@ -15,11 +14,12 @@ const useHotspots = (
   } | null>(null);
 
   const fetchHotspots = useCallback(
-    async (center: L.LatLng, zoom: number, dist: number) => {
+    async (
+      center: L.LatLng,
+      zoom: number,
+      dist: number
+    ) => {
       if (dist > 50) {
-        abortRef.current?.abort();
-        abortRef.current = null;
-
         onHotspotsChanged([]);
         return;
       }
@@ -36,18 +36,20 @@ const useHotspots = (
         }
       }
 
+      lastFetchRef.current = {
+        lat: center.lat,
+        lng: center.lng,
+        zoom,
+      };
+
       abortRef.current?.abort();
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      const requestId = ++requestIdRef.current;
+      abortRef.current = new AbortController();
 
       try {
         const response = await fetch(
           `/api/ebirdHotspots?lat=${center.lat}&lng=${center.lng}&dist=${dist}`,
           {
-            signal: controller.signal,
+            signal: abortRef.current.signal,
           }
         );
 
@@ -57,39 +59,19 @@ const useHotspots = (
 
         const hotspots: Hotspot[] = await response.json();
 
-        if (requestId !== requestIdRef.current) {
-          return;
-        }
-
-        lastFetchRef.current = {
-          lat: center.lat,
-          lng: center.lng,
-          zoom,
-        };
-
         onHotspotsChanged(
-          hotspots.filter((h) => h.latestObsDt !== null)
+          hotspots.filter(h => h.latestObsDt !== null)
         );
-      } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === "AbortError") {
-          return;
-        }
-
-        console.error(err);
-      } finally {
-        if (abortRef.current === controller) {
-          abortRef.current = null;
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          console.error(err);
         }
       }
     },
     [onHotspotsChanged]
   );
 
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, []);
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   return fetchHotspots;
 };
