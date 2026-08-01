@@ -43,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const data = (await response.json()).filter(isRecentObservation);
 
     if (Number(lat) === Number(process.env.NEXT_PUBLIC_LAT) && Number(lng) === Number(process.env.NEXT_PUBLIC_LNG)) {
-      await redis.set(cacheKey, JSON.stringify(data), 'EX', 30 * 24 * 60 * 60);
+      await redis.set(cacheKey, JSON.stringify(data), 'EX', 600);
     }
 
     res.status(200).json(data);
