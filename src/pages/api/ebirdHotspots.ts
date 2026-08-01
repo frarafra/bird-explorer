@@ -18,13 +18,10 @@ const isRecentObservation = (location: Hotspot) => {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { lat, lng, dist } = req.query;
-  const cacheKey = `ebirdHotspots:${process.env.NEXT_PUBLIC_LAT}:${process.env.NEXT_PUBLIC_LNG}`;
-  let cachedData;
+  const cacheKey = `ebirdHotspots:${lat}:${lng}`;
 
   try {
-    if (Number(lat) === Number(process.env.NEXT_PUBLIC_LAT) && Number(lng) === Number(process.env.NEXT_PUBLIC_LNG)) {
-        cachedData = await redis.get(cacheKey);
-    }
+    const cachedData = await redis.get(cacheKey);
 
     if (cachedData) {
       return res.status(200).json(JSON.parse(cachedData));
@@ -42,9 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const data = (await response.json()).filter(isRecentObservation);
 
-    if (Number(lat) === Number(process.env.NEXT_PUBLIC_LAT) && Number(lng) === Number(process.env.NEXT_PUBLIC_LNG)) {
-      await redis.set(cacheKey, JSON.stringify(data), 'EX', 600);
-    }
+    await redis.set(cacheKey, JSON.stringify(data), 'EX', 600);
 
     res.status(200).json(data);
   } catch (error) {
