@@ -18,7 +18,7 @@ const isRecentObservation = (location: Hotspot) => {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { lat, lng, dist } = req.query;
-  const cacheKey = `ebirdHotspots:${lat}:${lng}`;
+  const cacheKey = `ebirdHotspots:${lat}:${lng}:${dist}`;
 
   try {
     const cachedData = await redis.get(cacheKey);
