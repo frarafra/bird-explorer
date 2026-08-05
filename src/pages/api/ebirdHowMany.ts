@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { searchObservations } from './ebirdObservations';
+import { getRedisClient } from '../../client/redis';
 
 const BATCH_SIZE = 3;
 const BATCH_DELAY_MS = 300;
@@ -33,6 +34,7 @@ function getAbundanceRange(total: number) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const redis = getRedisClient();
   const speciesParam = req.query.species;
   const speciesCodes = typeof speciesParam === 'string'
     ? speciesParam.split(',').map(s => s.trim()).filter(Boolean)
@@ -47,7 +49,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const lat = Number(req.query.lat ?? process.env.NEXT_PUBLIC_LAT ?? 0);
   const lng = Number(req.query.lng ?? process.env.NEXT_PUBLIC_LNG ?? 0);
 
+  const cacheKey = `ebirdHowMany:${Array.isArray(speciesParam) ? speciesParam.join(',') : String(speciesParam)}:${lat}:${lng}`;
+
   try {
+    const cachedData = await redis.get(cacheKey);
+
+    if (cachedData) {
+      return res.status(200).json(JSON.parse(cachedData));
+    }
+
     const allResults: Array<PromiseSettledResult<unknown>> = [];
 
     for (let index = 0; index < speciesCodes.length; index += BATCH_SIZE) {
@@ -112,7 +122,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     });
 
-    res.status(200).json({
+    const payload = {
       birds: freqBirds,
       abundanceRanges: [
         { rate: 1, range: { min: 1, max: 20 } },
@@ -120,7 +130,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         { rate: 3, range: { min: 101, max: 500 } },
         { rate: 4, range: { min: 501, max: Infinity } },
       ],
-    });
+    };
+
+    await redis.set(cacheKey, JSON.stringify(payload), 'EX', 600);
+
+    res.status(200).json(payload);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal Server Error' });
