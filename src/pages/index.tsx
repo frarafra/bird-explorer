@@ -119,11 +119,19 @@ const HomePage = () => {
         try {
             const response = await fetch(`/api/osNominatim?location=${encodeURIComponent(searchValue)}&_=${new Date().getTime()}`);
             if (!response.ok) {
-                throw new Error(`Failed to geocode location: ${response.statusText}`);
+                console.warn(`Location not found for: ${searchValue}`);
+                return;
             }
 
             const { lat, lon } = await response.json();
-            setMapCenter({ lat: Number(lat), lng: Number(lon) });
+            const parsedLat = Number(lat);
+            const parsedLng = Number(lon);
+
+            if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) {
+                return;
+            }
+
+            setMapCenter({ lat: parsedLat, lng: parsedLng });
             setMapDist(25);
             setMapZoom(12);
             setObservations([]);

@@ -1,5 +1,6 @@
 import { FC, ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -7,6 +8,7 @@ interface MainLayoutProps {
 }
 
 const MainLayout: FC<MainLayoutProps> = ({ children, shareButton }) => {
+  const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -33,10 +35,10 @@ const MainLayout: FC<MainLayoutProps> = ({ children, shareButton }) => {
         <div className="mx-auto flex items-center justify-between gap-1.5 px-3 py-3 sm:px-6 lg:px-8">
           <nav className="min-w-0 flex-1 overflow-hidden sm:w-auto">
             <ul className="flex min-w-max items-center gap-1 whitespace-nowrap text-sm font-medium text-slate-700 sm:gap-2 sm:text-base dark:text-slate-200">
-              <li className="shrink-0"><Link href="/" className="rounded px-2 py-1 transition hover:text-slate-900 dark:hover:text-white">Search</Link></li>
-              <li className="shrink-0"><Link href="/birds" className="rounded px-2 py-1 transition hover:text-slate-900 dark:hover:text-white">Birds</Link></li>
-              <li className="shrink-0"><Link href="/songbook" className="rounded px-2 py-1 transition hover:text-slate-900 dark:hover:text-white">Songbook</Link></li>
-              <li className="shrink-0"><Link href="/quizzes" className="rounded px-2 py-1 transition hover:text-slate-900 dark:hover:text-white">Quizzes</Link></li>
+              <li className="shrink-0"><Link href="/" className={`rounded px-2 py-1 transition hover:text-slate-900 dark:hover:text-white ${router.pathname === '/' ? 'font-semibold text-slate-900 dark:text-white' : ''}`}>Search</Link></li>
+              <li className="shrink-0"><Link href="/birds" className={`rounded px-2 py-1 transition hover:text-slate-900 dark:hover:text-white ${router.pathname === '/birds' ? 'font-semibold text-slate-900 dark:text-white' : ''}`}>Birds</Link></li>
+              <li className="shrink-0"><Link href="/songbook" className={`rounded px-2 py-1 transition hover:text-slate-900 dark:hover:text-white ${router.pathname === '/songbook' ? 'font-semibold text-slate-900 dark:text-white' : ''}`}>Songbook</Link></li>
+              <li className="shrink-0"><Link href="/quizzes" className={`rounded px-2 py-1 transition hover:text-slate-900 dark:hover:text-white ${router.pathname === '/quizzes' ? 'font-semibold text-slate-900 dark:text-white' : ''}`}>Quizzes</Link></li>
             </ul>
           </nav>
 
