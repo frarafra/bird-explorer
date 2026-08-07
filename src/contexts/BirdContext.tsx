@@ -76,7 +76,7 @@ export const BirdContext = createContext<BirdContextType>({
     },
     setMapCenter: () => {},
 
-    mapZoom: 10,
+    mapZoom: 12,
     setMapZoom: () => {},
 
     mapDist: 25,
@@ -136,7 +136,7 @@ export const BirdProvider: FC<BirdProviderProps> = ({
         )
     });
 
-    const [mapZoom, setMapZoom] = useState<number>(10);
+    const [mapZoom, setMapZoom] = useState<number>(12);
 
     const [mapDist, setMapDist] = useState<number>(25);
 
