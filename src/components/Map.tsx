@@ -96,13 +96,11 @@ const MapEventsHandler = ({
   return null;
 };
 
-const UpdateMapView = ({ lat, lng, extended }: { lat: number; lng: number; extended: boolean }) => {
+const UpdateMapView = ({ lat, lng, zoom }: { lat: number; lng: number; zoom: number }) => {
   const map = useMap();
   useEffect(() => {
-    if (!extended) {
-      map.setView([lat, lng], map.getZoom());
-    }
-  }, [lat, lng, map, extended]);
+    map.setView([lat, lng], zoom);
+  }, [lat, lng, zoom, map]);
   return null;
 };
 
@@ -188,7 +186,7 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId 
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               />
               {extended && <FitBounds bounds={bounds} />}
-              <UpdateMapView lat={lat} lng={lng} extended={extended} />
+              <UpdateMapView lat={lat} lng={lng} zoom={mapZoom} />
 
               {results.map((result: Result) => (
                   <Marker
