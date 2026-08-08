@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker, ZoomControl, useMap, useMapEvents } from 'react-leaflet';
 import Leaflet from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -117,13 +117,15 @@ const FitBounds = ({ bounds }: { bounds: [[number, number], [number, number]] | 
 };
   
 const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId }) => {
-  const { setMapCenter, setMapDist, mapZoom, setMapZoom } = useContext(BirdContext);
+  const { setMapCenter, setMapDist, mapZoom, setMapZoom, setObservations } = useContext(BirdContext);
   const [compareMode, setCompareMode] = useState(false);
   const [point1, setPoint1] = useState<{lat: number, lng: number, species: string[]} | null>(null);
   const [point2, setPoint2] = useState<{lat: number, lng: number, species: string[]} | null>(null);
   const [showComparison, setShowComparison] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [showLocationSearch, setShowLocationSearch] = useState(false);
+  const [locationQuery, setLocationQuery] = useState('');
   const [bounds, setBounds] = useState<[[number, number], [number, number]] | null>(null);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
 
@@ -175,12 +177,16 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId 
     setShowComparison(false);
   };
 
+  const mapButtonClass = 'absolute right-[10px] z-[9999] w-[44px] h-[44px] p-0 rounded-full flex items-center justify-center border shadow-sm cursor-pointer';
+
   return (
       <div style={{ position: 'relative', height: '100vh', width: '100%' }}>
-          <MapContainer
+            <MapContainer
               {...(!extended ? { center: [lat, lng], zoom: mapZoom } : {})}
+              zoomControl={false}
               style={{ height: "100%", width: "100%" }}
-          >
+            >
+              <ZoomControl position="bottomright" />
               <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -239,7 +245,6 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId 
               ))}
 
               {compareMode && <MapClickHandler onLocationSelected={handleLocationSelected} />}
-          </MapContainer>
 
           <button
               onClick={() => {
@@ -249,26 +254,79 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId 
                   setPoint2(null);
                 }
               }}
-              style={{
-                  position: 'absolute',
-                  top: isMobile ? 'auto' : '10px',
-                  right: isMobile ? 'auto' : '10px',
-                  bottom: isMobile ? '40px' : 'auto',
-                  left: isMobile ? '50%' : 'auto',
-                  transform: isMobile ? 'translateX(-50%)' : 'none',
-                  zIndex: 1000,
-                  padding: '8px 12px',
-                  marginBottom: '10px',
-                  background: compareMode ? '#ff6b6b' : '#4ecdc4',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  width: isMobile ? '90%' : 'auto'
-                }}
+              title={compareMode ? 'Cancel compare' : 'Compare locations'}
+              aria-pressed={compareMode}
+              className={`${mapButtonClass} top-[60px] ${ compareMode ? 'bg-red-500 text-white border-red-600' : 'bg-white text-slate-900 border-slate-200' }`} 
           >
-              {compareMode ? 'Cancel Compare' : 'Compare Locations'}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M12 2C8.686 2 6 4.686 6 8c0 4.42 6 12 6 12s6-7.58 6-12c0-3.314-2.686-6-6-6z" fill={compareMode ? '#fff' : '#10b981'} />
+                <circle cx="12" cy="8" r="2" fill={compareMode ? '#fff' : '#065f46'} />
+                <path d="M7 11a5 5 0 1 0-2 3.9" stroke={compareMode ? 'rgba(255,255,255,0.8)' : '#10b981'} strokeWidth="0" />
+              </svg>
           </button>
+
+          <div>
+            <button
+              onClick={() => setShowLocationSearch((s) => !s)}
+              aria-label="Open location search"
+              className={`${mapButtonClass} top-[10px] bg-white text-slate-900 border-slate-200`} 
+            >
+              <svg width="18" height="18" viewBox="0 0 512 512" fill="currentColor" aria-hidden>
+                <path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z" />
+              </svg>
+            </button>
+
+            {showLocationSearch && (
+              <div className={`${isMobile ? 'left-1/2 -translate-x-1/2 w-[90%]' : 'right-[10px] w-[300px]'} absolute top-[110px] z-[9999] bg-white p-2 rounded-md shadow-lg`}>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const searchValue = locationQuery.trim();
+                    if (!searchValue) return;
+                    try {
+                      const timestamp = new Date().getTime();
+                      const response = await fetch(`/api/osNominatim?location=${encodeURIComponent(searchValue)}&_=${timestamp}`);
+                      if (!response.ok) {
+                        console.warn(`Location not found for: ${searchValue}`);
+                        return;
+                      }
+                      const { lat, lon } = await response.json();
+                      const parsedLat = Number(lat);
+                      const parsedLng = Number(lon);
+                      if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) {
+                        return;
+                      }
+                      setMapCenter({ lat: parsedLat, lng: parsedLng });
+                      setMapDist(25);
+                      setMapZoom(12);
+                      if (setObservations) setObservations([]);
+                      setShowLocationSearch(false);
+                      setLocationQuery('');
+                    } catch (err) {
+                      console.error('Error searching location from map:', err);
+                    }
+                  }}
+                >
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        value={locationQuery}
+                        onChange={(e) => setLocationQuery(e.target.value)}
+                        placeholder="Go to place"
+                        aria-label="Location"
+                        className="w-full px-3 py-2 rounded-md border border-slate-200 focus:outline-none"
+                      />
+                    </div>
+                    <button type="submit" disabled={!locationQuery.trim()} className="px-3 py-2 rounded-md bg-emerald-500 text-white">
+                      Go
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+
+          </MapContainer>
 
           {showComparison && point1 && point2 && (
               <ComparisonResults

@@ -51,8 +51,6 @@ const HomePage = () => {
 
     const { birds, setBirds, observations, setObservations, mapCenter, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setTaxonomies } = useContext(BirdContext);
     const [hoveredResultId, setHoveredResultId] = useState<number | null>(null);
-    const [locationQuery, setLocationQuery] = useState('');
-    const [searchMode, setSearchMode] = useState<'birds' | 'location'>('birds');
     const isInitialMount = useRef(true);
 
     const { lat, lng } = mapCenter;
@@ -112,44 +110,6 @@ const HomePage = () => {
         getBirdObservations(bird);
     };
 
-    const handleLocationSearch = async (location: string) => {
-        const searchValue = location?.trim();
-        if (!searchValue) return;
-
-        try {
-            const response = await fetch(`/api/osNominatim?location=${encodeURIComponent(searchValue)}&_=${new Date().getTime()}`);
-            if (!response.ok) {
-                console.warn(`Location not found for: ${searchValue}`);
-                return;
-            }
-
-            const { lat, lon } = await response.json();
-            const parsedLat = Number(lat);
-            const parsedLng = Number(lon);
-
-            if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) {
-                return;
-            }
-
-            setMapCenter({ lat: parsedLat, lng: parsedLng });
-            setMapDist(25);
-            setMapZoom(12);
-            setObservations([]);
-        } catch (error) {
-            console.error('Error searching location:', error);
-            setObservations([]);
-        }
-    };
-
-    const handleLocationSearchSubmit = async (event: React.FormEvent) => {
-        event.preventDefault();
-        const searchValue = locationQuery.trim();
-        if (!searchValue) return;
-
-        handleLocationSearch(searchValue);
-        setLocationQuery('');
-    };
-
     const setMapCenterFromQueryParams = (lat: string | undefined, lng: string | undefined, zoom: string | undefined) => {
         if (lat && lng && zoom) {
             const parsedLat = parseFloat(lat);
@@ -188,43 +148,7 @@ const HomePage = () => {
         <MainLayout shareButton={<ShareButton mapCenter={mapCenter} mapZoom={mapZoom} species={species as string}/>}>
             <div style={{ display: 'flex', height: '100vh' }}>
                 <div style={{ flex: 2, paddingRight: '20px' }}>
-                    <div className="mb-3 flex gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setSearchMode('birds')}
-                            className={`rounded-lg px-3 py-2 text-sm transition ${searchMode === 'birds' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'}`}
-                        >
-                            birds
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setSearchMode('location')}
-                            className={`rounded-lg px-3 py-2 text-sm transition ${searchMode === 'location' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'}`}
-                        >
-                            location
-                        </button>
-                    </div>
-
-                    {searchMode === 'birds' ? (
-                        <SearchBox onSearch={handleSearch} />
-                    ) : (
-                        <form onSubmit={handleLocationSearchSubmit} className="flex flex-col gap-2 sm:flex-row">
-                            <input
-                                type="text"
-                                value={locationQuery}
-                                onChange={(e) => setLocationQuery(e.target.value)}
-                                placeholder="Search location..."
-                                className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-emerald-400 dark:focus:ring-emerald-900 sm:px-3 sm:py-2 sm:text-sm"
-                            />
-                            <button
-                                type="submit"
-                                disabled={!locationQuery.trim()}
-                                className="w-full rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 sm:w-auto dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
-                            >
-                                Search
-                            </button>
-                        </form>
-                    )}
+                    <SearchBox onSearch={handleSearch} />
                     <SearchResults results={observations.slice(0, 10).sort((a: Result, b: Result) => {
                         const aObsDt = Date.parse(a.obsDt);
                         const bObsDt = Date.parse(b.obsDt);
