@@ -146,19 +146,21 @@ const HomePage = () => {
 
     return (
         <MainLayout shareButton={<ShareButton mapCenter={mapCenter} mapZoom={mapZoom} species={species as string}/>}>
-            <div style={{ display: 'flex', height: '100vh' }}>
-                <div style={{ flex: 2, paddingRight: '20px' }}>
+            <div className="flex h-[100dvh]">
+                <div className="flex flex-[2] flex-col pr-5 overflow-hidden">
                     <SearchBox onSearch={handleSearch} />
-                    <SearchResults results={observations.slice(0, 10).sort((a: Result, b: Result) => {
-                        const aObsDt = Date.parse(a.obsDt);
-                        const bObsDt = Date.parse(b.obsDt);
-                        if (bObsDt !== aObsDt) {
-                            return bObsDt - aObsDt;
-                        }
-                        return b.howMany - a.howMany;
-                    })} setHoveredResultId={setHoveredResultId} />
+                    <div className="flex-1 overflow-y-auto">
+                        <SearchResults results={observations.slice(0, 10).sort((a: Result, b: Result) => {
+                            const aObsDt = Date.parse(a.obsDt);
+                            const bObsDt = Date.parse(b.obsDt);
+                            if (bObsDt !== aObsDt) {
+                                return bObsDt - aObsDt;
+                            }
+                            return b.howMany - a.howMany;
+                        })} setHoveredResultId={setHoveredResultId} />
+                    </div>
                 </div>
-                <div style={{ flex: 3, position: 'relative', height: '100vh' }}>
+                <div className="relative min-h-0 flex-[3]">
                     <Map extended={extended === 'true'} lat={mapCenter.lat} lng={mapCenter.lng} results={observations} hoveredResultId={hoveredResultId}  />
                 </div>
             </div>

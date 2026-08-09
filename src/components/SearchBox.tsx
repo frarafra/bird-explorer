@@ -143,46 +143,50 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch }) => {
             </form>
 
             {suggestions.length > 0 && (
-                <ul style={{ listStyleType: 'none', paddingLeft: 0 }}>
-                    {suggestions.map((suggestion, index) => (
-                        <li
-                            key={index}
-                            onClick={() => {
-                                setSuggestionSelected(true);
-                                setBird(suggestion);
-                                setSuggestions([]);
-                                setExtendedBird({});
-                                setExtendedSuggestions([]);
-                            }}
-                            className="mt-1 cursor-pointer rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        >
-                            {suggestion}
-                        </li>
-                    ))}
-                </ul>
-            )}
-            {extendedSuggestions?.length > 0 && (
-                <div>
-                    <p>Species outside the map bounds:</p>
+                <div className="max-h-[calc(100dvh-200px)] overflow-y-auto">
                     <ul style={{ listStyleType: 'none', paddingLeft: 0 }}>
-                        {extendedSuggestions.map((suggestion, index) => (
+                        {suggestions.map((suggestion, index) => (
                             <li
                                 key={index}
                                 onClick={() => {
                                     setSuggestionSelected(true);
-                                    setExtendedBird(suggestion);
-                                    setBird(suggestion.name);
+                                    setBird(suggestion);
                                     setSuggestions([]);
+                                    setExtendedBird({});
                                     setExtendedSuggestions([]);
                                 }}
                                 className="mt-1 cursor-pointer rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                             >
-                                {suggestion.name}
+                                {suggestion}
                             </li>
                         ))}
                     </ul>
                 </div>
             )}
+            {extendedSuggestions?.length > 0 && (
+                <div>
+                    <p>Species outside the map bounds:</p>
+                    <div className="max-h-[calc(100dvh-250px)] overflow-y-auto">
+                        <ul style={{ listStyleType: 'none', paddingLeft: 0 }}>
+                            {extendedSuggestions.map((suggestion, index) => (
+                                <li
+                                    key={index}
+                                    onClick={() => {
+                                        setSuggestionSelected(true);
+                                        setExtendedBird(suggestion);
+                                        setBird(suggestion.name);
+                                        setSuggestions([]);
+                                        setExtendedSuggestions([]);
+                                    }}
+                                    className="mt-1 cursor-pointer rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                >
+                                    {suggestion.name}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            )}        
         </div>
     );
 };
