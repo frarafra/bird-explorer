@@ -239,8 +239,12 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId 
                   }}
                 >
                   <Popup>
-                    <strong>{hotspot.locName}</strong>
-                  </Popup>
+                      <strong>
+                        <a href={`https://ebird.org/hotspot/${hotspot.locId}`} target="_blank" rel="noopener noreferrer">
+                          {hotspot.locName}
+                        </a>
+                      </strong>
+                    </Popup>
                 </CircleMarker>
               ))}
 
