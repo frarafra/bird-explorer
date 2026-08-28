@@ -9,7 +9,7 @@ const EBIRD_HOTSPOT_API_URL = 'https://api.ebird.org/v2/ref/hotspot/geo?fmt=json
 
 const isRecentObservation = (location: Hotspot) => {
   const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 14);
 
   const obsDate = location.latestObsDt ? new Date(location.latestObsDt.replace(" ", "T")) : null;
 

@@ -52,27 +52,8 @@ const HomePage = () => {
     const { birds, setBirds, observations, setObservations, mapCenter, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setTaxonomies } = useContext(BirdContext);
     const [hoveredResultId, setHoveredResultId] = useState<number | null>(null);
     const isInitialMount = useRef(true);
-
     const { lat, lng } = mapCenter;
     
-    const fetchBirds = async (newLat?: string, newLng?: string, dist?: number) => {
-        try {
-            const response = await fetch(`/api/ebirdSpeciesSearch?lat=${newLat}&lng=${newLng}&dist=${dist}&_=${new Date().getTime()}`);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch birds: ${response.statusText}`);
-            }
-
-            const birds = await response.json();
-            
-            setBirds(birds.reduce((acc: Record<string, string>, obs: any) => {
-                acc[obs.comName.toLowerCase()] = obs.speciesCode;
-                return acc;
-            }, {}));
-        } catch (error) {
-            console.error('Error fetching birds:', error);
-        }
-    };
-
     const fetchTaxonomies = async (speciesCodes: string[]) => {
         try {
             const timestamp = new Date().getTime();
@@ -125,8 +106,48 @@ const HomePage = () => {
         setMapCenterFromQueryParams(latParam as string, lngParam as string, zoomParam as string);
     }, [latParam, lngParam, zoomParam]);
 
+
     useEffect(() => {
-        fetchBirds(lat.toString(), lng.toString(), mapDist);  
+        const controller = new AbortController();
+
+        const fetchBirds = async () => {
+            try {
+                const response = await fetch(
+                    `/api/ebirdSpeciesSearch?lat=${lat}&lng=${lng}&dist=${mapDist}&_=${Date.now()}`,
+                    { signal: controller.signal }
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        `Failed to fetch birds: ${response.statusText}`
+                    );
+                }
+
+                const birds = await response.json();
+
+                if (!controller.signal.aborted) {
+                    setBirds(
+                        birds.reduce(
+                            (acc: Record<string, string>, obs: any) => {
+                                acc[obs.comName.toLowerCase()] = obs.speciesCode;
+                                return acc;
+                            },
+                            {}
+                        )
+                    );
+                }
+            } catch (error: any) {
+                if (error.name !== 'AbortError') {
+                    console.error('Error fetching birds:', error);
+                }
+            }
+        };
+
+        fetchBirds();
+
+        return () => {
+            controller.abort();
+        };
     }, [lat, lng, mapDist]);
 
     useEffect(() => {
