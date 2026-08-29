@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import CopyToClipboard from 'react-copy-to-clipboard';
@@ -52,8 +52,45 @@ const HomePage = () => {
     const { birds, setBirds, observations, setObservations, mapCenter, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setTaxonomies } = useContext(BirdContext);
     const [hoveredResultId, setHoveredResultId] = useState<number | null>(null);
     const isInitialMount = useRef(true);
+    const controllerRef = useRef<AbortController | null>(null);
     const { lat, lng } = mapCenter;
     
+    const fetchBirds = useCallback(async (lat: number, lng: number, mapDist: number) => {
+        controllerRef.current?.abort();
+
+        const controller = new AbortController();
+        controllerRef.current = controller;
+
+        try {
+            const response = await fetch(
+                `/api/ebirdSpeciesSearch?lat=${lat}&lng=${lng}&dist=${mapDist}&_=${Date.now()}`,
+                { signal: controller.signal }
+            );
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch birds: ${response.statusText}`);
+            }
+
+            const birds = await response.json();
+
+            if (controller.signal.aborted) return;
+
+            setBirds(
+                birds.reduce(
+                    (acc: Record<string, string>, obs: any) => {
+                        acc[obs.comName.toLowerCase()] = obs.speciesCode;
+                        return acc;
+                    },
+                    {}
+                )
+            );
+        } catch (error: any) {
+            if (error.name !== "AbortError") {
+                console.error("Error fetching birds:", error);
+            }
+        }
+    }, []);
+
     const fetchTaxonomies = async (speciesCodes: string[]) => {
         try {
             const timestamp = new Date().getTime();
@@ -106,44 +143,8 @@ const HomePage = () => {
         setMapCenterFromQueryParams(latParam as string, lngParam as string, zoomParam as string);
     }, [latParam, lngParam, zoomParam]);
 
-
     useEffect(() => {
-        const controller = new AbortController();
-
-        const fetchBirds = async () => {
-            try {
-                const response = await fetch(
-                    `/api/ebirdSpeciesSearch?lat=${lat}&lng=${lng}&dist=${mapDist}&_=${Date.now()}`,
-                    { signal: controller.signal }
-                );
-
-                if (!response.ok) {
-                    throw new Error(
-                        `Failed to fetch birds: ${response.statusText}`
-                    );
-                }
-
-                const birds = await response.json();
-
-                if (!controller.signal.aborted) {
-                    setBirds(
-                        birds.reduce(
-                            (acc: Record<string, string>, obs: any) => {
-                                acc[obs.comName.toLowerCase()] = obs.speciesCode;
-                                return acc;
-                            },
-                            {}
-                        )
-                    );
-                }
-            } catch (error: any) {
-                if (error.name !== 'AbortError') {
-                    console.error('Error fetching birds:', error);
-                }
-            }
-        };
-
-        fetchBirds();
+        fetchBirds(lat, lng, mapDist);
     }, [lat, lng, mapDist]);
 
     useEffect(() => {
