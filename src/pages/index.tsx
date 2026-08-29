@@ -10,40 +10,11 @@ import SearchBox from '../components/SearchBox';
 import SearchResults from '../components/SearchResults';
 import { MapCenter, Result } from '../types';
 import MainLayout from '../layouts/MainLayout';
+import ShareButton from '../components/ShareButton';
 
 const Map = dynamic(() => import('../components/Map'), {
     ssr: false,
 });
-
-const ShareButton = ({ mapCenter, mapZoom, species }: { mapCenter: MapCenter; mapZoom: number; species?: string }) => {
-    const isInitialMount = useRef(true);
-
-    useEffect(() => {
-            if (isInitialMount.current) { 
-                isInitialMount.current = false; 
-                return; 
-            }
-    }, []);
-
-    const getShareableLink = () => {
-        if (typeof window !== 'undefined') {
-            return `${window.location.origin}?lat=${mapCenter.lat}&lng=${mapCenter.lng}&zoom=${mapZoom}${species ? `&species=${species}` : ''}`;
-        }
-        return '';
-    };
-
-    return (
-        <CopyToClipboard text={getShareableLink()} onCopy={() => alert('Link copied to clipboard!')}>
-            <button
-                type="button"
-                aria-label="Copy shareable link"
-                className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-sm transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white sm:px-3 sm:py-2 sm:text-sm"
-            >
-                Link
-            </button>
-        </CopyToClipboard>
-    );
-};
 
 const HomePage = () => {
     const router = useRouter();
