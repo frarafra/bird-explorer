@@ -144,10 +144,6 @@ const HomePage = () => {
         };
 
         fetchBirds();
-
-        return () => {
-            controller.abort();
-        };
     }, [lat, lng, mapDist]);
 
     useEffect(() => {
