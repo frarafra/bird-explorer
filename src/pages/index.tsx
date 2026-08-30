@@ -22,10 +22,26 @@ const HomePage = () => {
 
     const { birds, setBirds, observations, setObservations, mapCenter, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setTaxonomies } = useContext(BirdContext);
     const [hoveredResultId, setHoveredResultId] = useState<number | null>(null);
-    const isInitialMount = useRef(true);
     const controllerRef = useRef<AbortController | null>(null);
     const { lat, lng } = mapCenter;
     
+    const fetchTaxonomies = async (speciesCodes: string[]) => {
+        try {
+            const timestamp = new Date().getTime();
+            const response = await fetch(`/api/taxonomy/species?speciesCodes=${speciesCodes.join(',')}&_=${timestamp}`);
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch taxonomies: ${response.statusText}`);
+            }
+
+            const taxonomies = await response.json();
+            
+            setTaxonomies(taxonomies);
+        } catch (error) {
+            console.error('Error fetching taxonomies:', error);
+        }
+    };
+
     const fetchBirds = useCallback(async (lat: number, lng: number, mapDist: number) => {
         controllerRef.current?.abort();
 
@@ -46,39 +62,24 @@ const HomePage = () => {
 
             if (controller.signal.aborted) return;
 
-            setBirds(
-                birds.reduce(
-                    (acc: Record<string, string>, obs: any) => {
-                        acc[obs.comName.toLowerCase()] = obs.speciesCode;
-                        return acc;
-                    },
-                    {}
-                )
-            );
+            const birdsMap: Record<string, string> = birds.reduce((acc: Record<string, string>, obs: any) => {
+                acc[obs.comName.toLowerCase()] = obs.speciesCode;
+                return acc;
+            }, {})
+
+            setBirds(birdsMap);
+
+            const speciesCodes = Object.values(birdsMap);
+            if (speciesCodes.length > 0) {
+                await fetchTaxonomies(speciesCodes);
+            }
         } catch (error: any) {
             if (error.name !== "AbortError") {
                 console.error("Error fetching birds:", error);
             }
         }
-    }, []);
-
-    const fetchTaxonomies = async (speciesCodes: string[]) => {
-        try {
-            const timestamp = new Date().getTime();
-            const response = await fetch(`/api/taxonomy/species?speciesCodes=${speciesCodes.join(',')}&_=${timestamp}`);
-
-            if (!response.ok) {
-                throw new Error(`Failed to fetch taxonomies: ${response.statusText}`);
-            }
-
-            const taxonomies = await response.json();
-            
-            setTaxonomies(taxonomies);
-        } catch (error) {
-            console.error('Error fetching taxonomies:', error);
-        }
-    };
-    
+    }, [fetchTaxonomies]);
+   
     const getBirdObservations = async (bird: string) => {
         if (!bird ||!mapCenter.lat || !mapCenter.lng) return;
 
@@ -117,17 +118,6 @@ const HomePage = () => {
     useEffect(() => {
         fetchBirds(lat, lng, mapDist);
     }, [lat, lng, mapDist]);
-
-    useEffect(() => {
-        if (isInitialMount.current) { 
-            isInitialMount.current = false; 
-            return; 
-        }
-        const speciesCodes = Object.values(birds);
-        if (speciesCodes.length > 0) {
-            fetchTaxonomies(speciesCodes);
-        }
-    }, [birds]);
 
     useEffect(() => {
         getBirdObservations(species as string);
