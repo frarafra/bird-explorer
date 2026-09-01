@@ -27,6 +27,9 @@ interface BirdContextType {
     observations: Result[];
     setObservations: React.Dispatch<React.SetStateAction<Result[]>>;
 
+    speciesObserved: Result[];
+    setSpeciesObserved: React.Dispatch<React.SetStateAction<Result[]>>;
+
     mapCenter: MapCenter;
     setMapCenter: React.Dispatch<React.SetStateAction<MapCenter>>;
 
@@ -40,6 +43,8 @@ interface BirdContextType {
     setTaxonomies: React.Dispatch<
         React.SetStateAction<Record<string, string>>
     >;
+    taxonomiesReady: boolean;
+    setTaxonomiesReady: React.Dispatch<React.SetStateAction<boolean>>;
 
     page: number;
     setPage: React.Dispatch<React.SetStateAction<number>>;
@@ -67,8 +72,13 @@ export const BirdContext = createContext<BirdContextType>({
     observations: [],
     setObservations: () => {},
 
+    speciesObserved: [],
+    setSpeciesObserved: () => {},
+
     taxonomies: {},
     setTaxonomies: () => {},
+    taxonomiesReady: false,
+    setTaxonomiesReady: () => {},
 
     mapCenter: {
         lat: parseFloat(process.env.NEXT_PUBLIC_LAT || '0'),
@@ -117,6 +127,9 @@ export const BirdProvider: FC<BirdProviderProps> = ({
     const [observations, setObservations] =
         useState<Result[]>([]);
 
+    const [speciesObserved, setSpeciesObserved] =
+        useState<Result[]>([]);
+
     const [taxonomies, setTaxonomies] = useState<
         Record<string, string>
     >({});
@@ -135,6 +148,7 @@ export const BirdProvider: FC<BirdProviderProps> = ({
             process.env.NEXT_PUBLIC_LNG || '0'
         )
     });
+    const [taxonomiesReady, setTaxonomiesReady] = useState<boolean>(false);
 
     const [mapZoom, setMapZoom] = useState<number>(10);
 
@@ -169,6 +183,9 @@ export const BirdProvider: FC<BirdProviderProps> = ({
                 observations,
                 setObservations,
 
+                speciesObserved,
+                setSpeciesObserved,
+
                 taxonomies,
                 setTaxonomies,
 
@@ -186,6 +203,8 @@ export const BirdProvider: FC<BirdProviderProps> = ({
 
                 pageRec,
                 setPageRec,
+                taxonomiesReady,
+                setTaxonomiesReady,
 
                 selectedGroup,
                 setSelectedGroup,

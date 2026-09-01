@@ -20,7 +20,7 @@ const HomePage = () => {
     const router = useRouter();
     const { lat: latParam, lng: lngParam, zoom: zoomParam, species, extended } = router.query;
 
-    const { birds, setBirds, observations, setObservations, mapCenter, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setTaxonomies } = useContext(BirdContext);
+    const { setBirds, observations, setObservations, mapCenter, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setTaxonomies, setTaxonomiesReady } = useContext(BirdContext);
     const [hoveredResultId, setHoveredResultId] = useState<number | null>(null);
     const controllerRef = useRef<AbortController | null>(null);
     const { lat, lng } = mapCenter;
@@ -35,8 +35,9 @@ const HomePage = () => {
             }
 
             const taxonomies = await response.json();
-            
+
             setTaxonomies(taxonomies);
+            setTaxonomiesReady(true);
         } catch (error) {
             console.error('Error fetching taxonomies:', error);
         }
@@ -71,6 +72,8 @@ const HomePage = () => {
 
             const speciesCodes = Object.values(birdsMap);
             if (speciesCodes.length > 0) {
+                setTaxonomies({});
+                setTaxonomiesReady(false);
                 await fetchTaxonomies(speciesCodes);
             }
         } catch (error: any) {

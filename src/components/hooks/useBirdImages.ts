@@ -18,7 +18,7 @@ export const useBirdImages = ({
   selectedGroup,
   setSelectedGroup,
 }: UseBirdImagesProps) => {
-  const { setBirdImages, page } = useContext(BirdContext);
+  const { setBirdImages, page, taxonomiesReady } = useContext(BirdContext);
 
   const batchSize = Number(process.env.NEXT_PUBLIC_BATCH_SIZE);
 
@@ -101,8 +101,8 @@ export const useBirdImages = ({
 
       return response.json();
     },
-    enabled: birds.length > 0,
-    staleTime: 1000 * 5,
+    enabled: birds.length > 0 && taxonomiesReady,
+    staleTime: 1000 * 60 * 5,
   });
 
   useEffect(() => {
