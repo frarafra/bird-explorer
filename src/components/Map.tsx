@@ -117,7 +117,7 @@ const FitBounds = ({ bounds }: { bounds: [[number, number], [number, number]] | 
 };
   
 const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId }) => {
-  const { setMapCenter, setMapDist, mapZoom, setMapZoom, setObservations } = useContext(BirdContext);
+  const { setBirds, setBirdImages, setTaxonomies, setMapCenter, setMapDist, mapZoom, setMapZoom, setObservations } = useContext(BirdContext);
   const [compareMode, setCompareMode] = useState(false);
   const [point1, setPoint1] = useState<{lat: number, lng: number, species: string[]} | null>(null);
   const [point2, setPoint2] = useState<{lat: number, lng: number, species: string[]} | null>(null);
@@ -300,10 +300,13 @@ const Map: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId 
                       if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) {
                         return;
                       }
+                      setBirds({});
+                      setBirdImages({});
+                      setTaxonomies({});
+                      setObservations([]);
                       setMapCenter({ lat: parsedLat, lng: parsedLng });
                       setMapDist(25);
                       setMapZoom(12);
-                      if (setObservations) setObservations([]);
                       setShowLocationSearch(false);
                       setLocationQuery('');
                     } catch (err) {
