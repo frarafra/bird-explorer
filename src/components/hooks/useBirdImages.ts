@@ -10,13 +10,11 @@ interface BirdData {
 interface UseBirdImagesProps {
   birds: [string, string][];
   selectedGroup: string;
-  setSelectedGroup: (group: string) => void;
 }
 
 export const useBirdImages = ({
   birds,
   selectedGroup,
-  setSelectedGroup,
 }: UseBirdImagesProps) => {
   const { setBirdImages, page, taxonomiesReady } = useContext(BirdContext);
 
@@ -62,11 +60,6 @@ export const useBirdImages = ({
       birds.length,
     ],
     queryFn: async () => {
-      if (birds.length === 0) {
-        setSelectedGroup('All Groups');
-        return [];
-      }
-
       const batch =
         selectedGroup === 'All Groups'
           ? birds

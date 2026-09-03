@@ -5,6 +5,7 @@ interface UseBirdTaxonomyProps {
   taxonomies: Record<string, string>;
   selectedGroup: string;
   setSelectedGroup: (group: string) => void;
+  taxonomiesReady?: boolean;
 }
 
 export const useBirdTaxonomy = ({
@@ -12,6 +13,7 @@ export const useBirdTaxonomy = ({
   taxonomies,
   selectedGroup,
   setSelectedGroup,
+  taxonomiesReady = false,
 }: UseBirdTaxonomyProps) => {
   const groups = useMemo(() => {
     const uniqueGroups = new Set<string>();
@@ -34,12 +36,12 @@ export const useBirdTaxonomy = ({
 
   useEffect(() => {
     if (
-      groups.length > 0 &&
+      taxonomiesReady &&
       (!selectedGroup || !groups.includes(selectedGroup))
     ) {
       setSelectedGroup('All Groups');
     }
-  }, [groups, selectedGroup, setSelectedGroup]);
+  }, [groups, selectedGroup, setSelectedGroup, taxonomiesReady]);
 
   const orderedBirds = useMemo(() => {
     const orderedGroups = Array.from(

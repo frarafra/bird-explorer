@@ -18,7 +18,8 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         page,
         setPage,
         selectedGroup,
-        setSelectedGroup
+        setSelectedGroup,
+        taxonomiesReady,
     } = useContext(BirdContext);
 
 
@@ -31,7 +32,6 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     const lng = Number(process.env.NEXT_PUBLIC_LNG ?? 0);
 
     const router = useRouter();
-
     const {
         groups,
         orderedBirds,
@@ -42,6 +42,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         taxonomies,
         selectedGroup,
         setSelectedGroup,
+        taxonomiesReady,
     });
 
     const {
@@ -49,7 +50,6 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     } = useBirdImages({
         birds: birdsByGroup,
         selectedGroup,
-        setSelectedGroup,
     });
 
     const {
