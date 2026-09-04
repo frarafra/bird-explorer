@@ -20,7 +20,7 @@ const HomePage = () => {
     const router = useRouter();
     const { lat: latParam, lng: lngParam, zoom: zoomParam, species, extended } = router.query;
 
-    const { setBirds, observations, setObservations, mapCenter, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setTaxonomies, setTaxonomiesReady } = useContext(BirdContext);
+    const { setBirds, setBirdImages, observations, setObservations, mapCenter, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setTaxonomies, setTaxonomiesReady } = useContext(BirdContext);
     const [hoveredResultId, setHoveredResultId] = useState<number | null>(null);
     const controllerRef = useRef<AbortController | null>(null);
     const { lat, lng } = mapCenter;
@@ -48,6 +48,10 @@ const HomePage = () => {
 
         const controller = new AbortController();
         controllerRef.current = controller;
+
+        setBirdImages({});
+        setTaxonomies({});
+        setTaxonomiesReady(false);
 
         try {
             const response = await fetch(

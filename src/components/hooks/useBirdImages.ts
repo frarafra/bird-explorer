@@ -16,9 +16,12 @@ export const useBirdImages = ({
   birds,
   selectedGroup,
 }: UseBirdImagesProps) => {
-  const { setBirdImages, page, taxonomiesReady } = useContext(BirdContext);
+  const { setBirdImages, page, taxonomiesReady, mapCenter } = useContext(BirdContext);
 
   const batchSize = Number(process.env.NEXT_PUBLIC_BATCH_SIZE);
+  const birdSignature = birds
+    .map(([name, code]) => `${name}:${code}`)
+    .join('|');
 
   // Warm up lambda once
   useEffect(() => {
@@ -58,6 +61,9 @@ export const useBirdImages = ({
       selectedGroup,
       page,
       birds.length,
+      birdSignature,
+      mapCenter.lat,
+      mapCenter.lng,
     ],
     queryFn: async () => {
       const batch =

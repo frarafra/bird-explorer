@@ -35,13 +35,17 @@ export const useBirdTaxonomy = ({
   }, [birds, taxonomies]);
 
   useEffect(() => {
+    const hasBirds = Object.keys(birds).length > 0;
+
     if (
       taxonomiesReady &&
-      (!selectedGroup || !groups.includes(selectedGroup))
+      hasBirds &&
+      selectedGroup !== 'All Groups' &&
+      !groups.includes(selectedGroup)
     ) {
       setSelectedGroup('All Groups');
     }
-  }, [groups, selectedGroup, setSelectedGroup, taxonomiesReady]);
+  }, [birds, groups, selectedGroup, setSelectedGroup, taxonomiesReady]);
 
   const orderedBirds = useMemo(() => {
     const orderedGroups = Array.from(
