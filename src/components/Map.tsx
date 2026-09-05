@@ -235,6 +235,8 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
       <MapContainer
         {...(!extended ? { center: [lat, lng], zoom: mapZoom } : {})}
         zoomControl={false}
+        zoomSnap={0.25}
+        zoomDelta={0.25}
         style={{ height: "100%", width: "100%" }}
       >
         <ZoomControl position="bottomright" />
