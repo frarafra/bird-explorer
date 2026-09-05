@@ -144,7 +144,7 @@ const FitBounds = ({ bounds }: { bounds: [[number, number], [number, number]] | 
 };
 
 const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId }) => {
-  const { setBirds, setBirdImages, setTaxonomies, setMapCenter, setMapDist, mapZoom, setMapZoom, setObservations, speciesObserved, taxonomiesReady } = useContext(BirdContext);
+  const { setBirds, setBirdImages, setTaxonomies, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setObservations, speciesObserved, taxonomiesReady } = useContext(BirdContext);
   const [compareMode, setCompareMode] = useState(false);
   const [point1, setPoint1] = useState<{lat: number, lng: number, species: string[]} | null>(null);
   const [point2, setPoint2] = useState<{lat: number, lng: number, species: string[]} | null>(null);
@@ -191,6 +191,7 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
     lat,
     lng,
     mapZoom,
+    mapDist,
   });
 
   const handleLocationSelected = async (lat: number, lng: number) => {
@@ -357,6 +358,7 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
           routeVisible={routeVisible}
           loading={routeLoading}
           disabled={disabled}
+          hidden={mapDist > 75}
           onToggleRoute={handleDiversityRouteToggle}
           disabledReason={disabledReason}
         />

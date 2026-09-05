@@ -9,6 +9,7 @@ interface UseDiversityRouteArgs {
   lat: number;
   lng: number;
   mapZoom: number;
+  mapDist: number;
 }
 
 interface UseDiversityRouteResult {
@@ -27,6 +28,7 @@ const useDiversityRoute = ({
   lat,
   lng,
   mapZoom,
+  mapDist,
 }: UseDiversityRouteArgs): UseDiversityRouteResult => {
   const [diversityRoute, setDiversityRoute] = useState<RouteGeoJSON | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
@@ -34,13 +36,15 @@ const useDiversityRoute = ({
   const retryTimeoutRef = useRef<number | null>(null);
 
   const routeMapKey = `${lat.toFixed(6)}:${lng.toFixed(6)}:${mapZoom}`;
-  const routeVisible = Boolean(diversityRoute);
-  const disabled = !taxonomiesReady;
+  const routeVisible = mapDist <= 75 && Boolean(diversityRoute);
+  const disabled = !taxonomiesReady || mapDist > 75;
   const disabledReason = !taxonomiesReady
     ? 'Waiting for map taxonomies to finish loading'
-    : !observations.length
-      ? 'No observations available'
-      : undefined;
+    : mapDist > 75
+      ? 'Route is only available for map areas 75 km or smaller'
+      : !observations.length
+        ? 'No observations available'
+        : undefined;
 
   const handleDiversityRouteToggle = useCallback(async () => {
     if (routeLoading) {

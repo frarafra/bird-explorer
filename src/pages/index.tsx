@@ -49,13 +49,15 @@ const HomePage = () => {
         const controller = new AbortController();
         controllerRef.current = controller;
 
+        const safeMapDist = Math.min(mapDist, 50);
+
         setBirdImages({});
         setTaxonomies({});
         setTaxonomiesReady(false);
 
         try {
             const response = await fetch(
-                `/api/ebirdSpeciesSearch?lat=${lat}&lng=${lng}&dist=${mapDist}&_=${Date.now()}`,
+                `/api/ebirdSpeciesSearch?lat=${lat}&lng=${lng}&dist=${safeMapDist}&_=${Date.now()}`,
                 { signal: controller.signal }
             );
 

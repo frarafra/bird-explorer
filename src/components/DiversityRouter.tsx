@@ -31,6 +31,7 @@ interface DiversityRouterProps {
   routeVisible: boolean;
   loading: boolean;
   disabled: boolean;
+  hidden?: boolean;
   onToggleRoute: () => void;
   disabledReason?: string;
 }
@@ -39,9 +40,14 @@ const DiversityRouter = ({
   routeVisible,
   loading,
   disabled,
+  hidden = false,
   onToggleRoute,
   disabledReason,
 }: DiversityRouterProps) => {
+
+  if (hidden) {
+    return null;
+  }
 
   const buttonClasses = [
     'absolute right-[10px] top-[110px] z-[9999]',

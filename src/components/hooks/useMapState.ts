@@ -12,10 +12,10 @@ const useMapState = (
     const center = map.getCenter();
     const zoom = map.getZoom();
     const bounds = map.getBounds();
-
+    const radiusMeters = map.distance(center, bounds.getNorthEast());
     const dist = Math.max(
       5,
-      Math.ceil(Math.abs(bounds.getNorth() - center.lat) * 111)
+      Math.ceil(radiusMeters / 1000)
     );
 
     onMoveEnd({
@@ -24,7 +24,7 @@ const useMapState = (
     });
 
     setMapZoom(zoom);
-    setMapDist(Math.min(dist, 50));
+    setMapDist(dist);
 
     return {
       center,
