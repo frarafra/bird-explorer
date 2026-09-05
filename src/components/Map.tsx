@@ -143,6 +143,30 @@ const FitBounds = ({ bounds }: { bounds: [[number, number], [number, number]] | 
   return null;
 };
 
+const MapResizeHandler = ({ expanded }: { expanded: boolean }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    const refresh = () => {
+      const center = map.getCenter();
+      map.invalidateSize();
+      map.setView(center, map.getZoom());
+    };
+
+    const frame = requestAnimationFrame(refresh);
+    const timeout = window.setTimeout(refresh, 120);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
+  }, [expanded, map]);
+
+  return null;
+};
+
 const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId }) => {
   const { setBirds, setBirdImages, setTaxonomies, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setObservations, speciesObserved, taxonomiesReady } = useContext(BirdContext);
   const [compareMode, setCompareMode] = useState(false);
@@ -151,6 +175,7 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
   const [showComparison, setShowComparison] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [locationQuery, setLocationQuery] = useState('');
   const [bounds, setBounds] = useState<[[number, number], [number, number]] | null>(null);
@@ -231,14 +256,54 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
     'absolute right-[10px] z-[9999] w-[44px] h-[44px] p-0 rounded-full flex items-center justify-center border shadow-sm cursor-pointer';
 
   return (
-      <div style={{ position: 'relative', height: '100vh', width: '100%' }}>
+      <div
+        style={{
+          position: 'relative',
+          height: '100vh',
+          width: isMobile && isMapExpanded ? '94vw' : '100%',
+          marginLeft: isMobile && isMapExpanded
+            ? 'calc(100% - 93vw)'
+            : '0',
+          overflow: 'hidden',
+        }}
+      >
       <MapContainer
+        key={isMobile && isMapExpanded ? 'map-expanded' : 'map-collapsed'}
         {...(!extended ? { center: [lat, lng], zoom: mapZoom } : {})}
         zoomControl={false}
         zoomSnap={0.25}
         zoomDelta={0.25}
         style={{ height: "100%", width: "100%" }}
       >
+        <MapResizeHandler expanded={isMapExpanded} />
+        {isMobile && (
+          <button
+            type="button"
+            onClick={() => setIsMapExpanded((value) => !value)}
+            aria-label={isMapExpanded ? 'Collapse map width' : 'Expand map to full width'}
+            title={isMapExpanded ? 'Collapse map' : 'Expand map'}
+            className={`${mapButtonClass} left-[10px] top-[10px] bg-white text-slate-900 border-slate-200`}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              {isMapExpanded ? (
+                <>
+                  <path d="M15 3h6v6" />
+                  <path d="M14 10l7-7" />
+                  <path d="M9 21H3v-6" />
+                  <path d="M10 14l-7 7" />
+                </>
+              ) : (
+                <>
+                  <path d="M9 3H3v6" />
+                  <path d="M3 3l7 7" />
+                  <path d="M15 21h6v-6" />
+                  <path d="M21 21l-7-7" />
+                </>
+              )}
+            </svg>
+          </button>
+        )}
+
         <ZoomControl position="bottomright" />
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
