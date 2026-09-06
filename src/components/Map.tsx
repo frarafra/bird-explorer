@@ -260,9 +260,9 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
         style={{
           position: 'relative',
           height: '100vh',
-          width: isMobile && isMapExpanded ? '100vw' : '100%',
+          width: isMobile && isMapExpanded ? '94vw' : '100%',
           marginLeft: isMobile && isMapExpanded
-            ? 'calc(100% - 100vw)'
+            ? 'calc(100% - 93vw)'
             : '0',
           overflow: 'hidden',
         }}
