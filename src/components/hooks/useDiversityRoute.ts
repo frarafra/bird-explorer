@@ -51,16 +51,6 @@ const useDiversityRoute = ({
       return;
     }
 
-    if (!taxonomiesReady) {
-      if (retryTimeoutRef.current === null) {
-        retryTimeoutRef.current = window.setTimeout(() => {
-          retryTimeoutRef.current = null;
-          void handleDiversityRouteToggle();
-        }, 1000);
-      }
-      return;
-    }
-
     if (!observations.length) {
       console.warn('No observations available for diversity route');
       return;
