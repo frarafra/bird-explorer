@@ -3,7 +3,6 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
-import CopyToClipboard from 'react-copy-to-clipboard';
 
 import { BirdContext } from '../contexts/BirdContext';
 import SearchBox from '../components/SearchBox';
@@ -51,7 +50,6 @@ const HomePage = () => {
 
         const safeMapDist = Math.min(mapDist, 50);
 
-        setBirdImages({});
         setTaxonomies({});
         setTaxonomiesReady(false);
 

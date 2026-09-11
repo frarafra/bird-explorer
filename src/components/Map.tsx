@@ -567,21 +567,20 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
                         console.warn(`Location not found for: ${searchValue}`);
                       return;
                     }
-                      const { lat, lon } = await response.json();
-                      const parsedLat = Number(lat);
-                      const parsedLng = Number(lon);
-                      if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) {
+                    const { lat, lon } = await response.json();
+                    const parsedLat = Number(lat);
+                    const parsedLng = Number(lon);
+                    if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) {
                       return;
                     }
-                      setBirds({});
-                      setBirdImages({});
-                      setTaxonomies({});
-                      setObservations([]);
-                      setMapCenter({ lat: parsedLat, lng: parsedLng });
-                      setMapDist(25);
-                      setMapZoom(12);
-                      setShowLocationSearch(false);
-                      setLocationQuery('');
+                    setBirds({});
+                    setTaxonomies({});
+                    setObservations([]);
+                    setMapCenter({ lat: parsedLat, lng: parsedLng });
+                    setMapDist(25);
+                    setMapZoom(12);
+                    setShowLocationSearch(false);
+                    setLocationQuery('');
                   } catch (err) {
                       console.error('Error searching location from map:', err);
                   }
