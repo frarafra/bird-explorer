@@ -1,52 +1,29 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 
 interface BirdsLocationProps {
     lat: number;
     lng: number;
     species: string[];
+    locationName?: string;
+}
+
+interface ComparisonSummary {
+    commonBirds: string[];
+    uniqueToPoint1: string[];
+    uniqueToPoint2: string[];
 }
 
 interface ComparisonResultsProps {
     point1: BirdsLocationProps;
     point2: BirdsLocationProps;
+    comparison?: ComparisonSummary;
     onClose: () => void;
 }
 
-const getLocationName = async (lat: number, lng: number): Promise<string> => {
-    const response = await fetch(`/api/reverseGeocode?lat=${lat}&lng=${lng}`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch location name: ${response.statusText}`);
-    }
-    const data = await response.json();
-    return data.locationName || `${lat}, ${lng}`;
-};
-
-const ComparisonResults: React.FC<ComparisonResultsProps> = ({ point1, point2, onClose }) => {
-    const [locationName1, setLocationName1] = useState<string>('');
-    const [locationName2, setLocationName2] = useState<string>('');
-    const [isLoading, setIsLoading] = useState<boolean>(true);
+const ComparisonResults: React.FC<ComparisonResultsProps> = ({ point1, point2, comparison, onClose }) => {
     const containerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const fetchLocationNames = async () => {
-            try {
-                const name1 = await getLocationName(point1.lat, point1.lng);
-                const name2 = await getLocationName(point2.lat, point2.lng);
-                setLocationName1(name1);
-                setLocationName2(name2);
-            } catch (error) {
-                console.error('Error fetching location names:', error);
-                setLocationName1(`${point1.lat}, ${point1.lng}`);
-                setLocationName2(`${point2.lat}, ${point2.lng}`);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchLocationNames();
-    }, [point1, point2]);
 
     const scrollToTop = () => {
         if (containerRef.current) {
@@ -55,15 +32,13 @@ const ComparisonResults: React.FC<ComparisonResultsProps> = ({ point1, point2, o
     };
 
     if (!point1 || !point2) return null;
-    if (isLoading) return null;
 
-    const birds1 = [...new Set(point1.species)];
-    const birds2 = [...new Set(point2.species)];
+    const locationName1 = point1.locationName || `${point1.lat}, ${point1.lng}`;
+    const locationName2 = point2.locationName || `${point2.lat}, ${point2.lng}`;
 
-    const commonBirds = birds1.filter(bird => birds2.includes(bird));
-
-    const uniqueToPoint1 = birds1.filter(bird => !birds2.includes(bird));
-    const uniqueToPoint2 = birds2.filter(bird => !birds1.includes(bird));
+    const commonBirds = comparison?.commonBirds ?? [];
+    const uniqueToPoint1 = comparison?.uniqueToPoint1 ?? [];
+    const uniqueToPoint2 = comparison?.uniqueToPoint2 ?? [];
 
     return (
         <div

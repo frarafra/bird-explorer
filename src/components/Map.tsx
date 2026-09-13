@@ -178,8 +178,9 @@ const MapResizeHandler = ({ expanded }: { expanded: boolean }) => {
 const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId }) => {
   const { setBirds, setBirdImages, setTaxonomies, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setObservations, speciesObserved, taxonomiesReady } = useContext(BirdContext);
   const [compareMode, setCompareMode] = useState(false);
-  const [point1, setPoint1] = useState<{lat: number, lng: number, species: string[]} | null>(null);
-  const [point2, setPoint2] = useState<{lat: number, lng: number, species: string[]} | null>(null);
+  const [point1, setPoint1] = useState<{lat: number, lng: number, species: string[], locationName?: string} | null>(null);
+  const [point2, setPoint2] = useState<{lat: number, lng: number, species: string[], locationName?: string} | null>(null);
+  const [comparison, setComparison] = useState<{ commonBirds: string[]; uniqueToPoint1: string[]; uniqueToPoint2: string[] } | null>(null);
   const [showComparison, setShowComparison] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -229,33 +230,62 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
   const handleLocationSelected = async (lat: number, lng: number) => {
     if (!compareMode) return;
 
-      setIsLoading(true);
-      try {
-      const timestamp = new Date().getTime();
-      const response = await fetch(`/api/ebirdSpeciesSearch?lat=${lat}&lng=${lng}&dist=10&_=${timestamp}`);
-        if (!response.ok) {
-        throw new Error(`Failed to fetch birds: ${response.statusText}`);
-        }
-
-      const birds = await response.json();
-
-        if (!point1) {
-        setPoint1({ lat, lng, species: birds.map((b: Result) => b.comName) });
-        } else if (!point2) {
-        setPoint2({ lat, lng, species: birds.map((b: Result) => b.comName) });
-          setShowComparison(true);
-          setCompareMode(false);
-        }
-      } catch (error) {
-      console.error('Error fetching species data:', error);
-      } finally {
-        setIsLoading(false);
+    setIsLoading(true);
+    try {
+      if (!point1) {
+        setPoint1({ lat, lng, species: [] });
+        return;
       }
-    };
+
+      if (!point2) {
+        const pendingPoint2 = { lat, lng, species: [] };
+        setPoint2(pendingPoint2);
+
+        const timestamp = new Date().getTime();
+        const response = await fetch(
+          `/api/getComparisonResults?lat1=${point1.lat}&lng1=${point1.lng}&lat2=${lat}&lng2=${lng}&dist=10&_=${timestamp}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch comparison birds: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        const point1Species = Array.isArray(data?.point1?.species)
+          ? data.point1.species.map((b: Result) => b.comName)
+          : [];
+        const point2Species = Array.isArray(data?.point2?.species)
+          ? data.point2.species.map((b: Result) => b.comName)
+          : [];
+
+        setPoint1({
+          lat: point1.lat,
+          lng: point1.lng,
+          species: point1Species,
+          locationName: data?.point1?.locationName ?? `${point1.lat}, ${point1.lng}`,
+        });
+        setPoint2({
+          lat,
+          lng,
+          species: point2Species,
+          locationName: data?.point2?.locationName ?? `${lat}, ${lng}`,
+        });
+        setComparison(data?.comparison ?? null);
+        setShowComparison(true);
+        setCompareMode(false);
+      }
+    } catch (error) {
+      console.error('Error fetching species data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const resetComparison = () => {
     setPoint1(null);
     setPoint2(null);
+    setComparison(null);
     setShowComparison(false);
   };
 
@@ -401,7 +431,7 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
           )
         )}
 
-              {compareMode && <MapClickHandler onLocationSelected={handleLocationSelected} />}
+        {compareMode && <MapClickHandler onLocationSelected={handleLocationSelected} />}
 
         <button
           onClick={() => {
@@ -616,6 +646,7 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
           <ComparisonResults
             point1={point1}
             point2={point2}
+            comparison={comparison ?? undefined}
             onClose={resetComparison}
           />
         )}
