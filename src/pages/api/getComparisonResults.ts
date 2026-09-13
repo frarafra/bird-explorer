@@ -68,9 +68,10 @@ export async function getComparisonResults({
   point1: ComparisonPointInput;
   point2: ComparisonPointInput;
 }) {
-  const speciesResults = await fetchComparisonSpecies(point1, point2);
-
-  const locationResults = await fetchLocationNames(point1, point2);
+  const [speciesResults, locationResults] = await Promise.all([
+    fetchComparisonSpecies(point1, point2),
+    fetchLocationNames(point1, point2),
+  ]);
 
   const species1: Array<{ comName: string }> =
     speciesResults[0].status === 'fulfilled' ? speciesResults[0].value : [];
