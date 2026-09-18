@@ -39,6 +39,9 @@ interface BirdContextType {
     mapDist: number;
     setMapDist: React.Dispatch<React.SetStateAction<number>>;
 
+    mapExpanded: boolean;
+    setMapExpanded: React.Dispatch<React.SetStateAction<boolean>>;
+
     taxonomies: Record<string, string>;
     setTaxonomies: React.Dispatch<
         React.SetStateAction<Record<string, string>>
@@ -91,6 +94,9 @@ export const BirdContext = createContext<BirdContextType>({
 
     mapDist: 25,
     setMapDist: () => {},
+
+    mapExpanded: false,
+    setMapExpanded: () => {},
 
     page: 0,
     setPage: () => {},
@@ -154,6 +160,25 @@ export const BirdProvider: FC<BirdProviderProps> = ({
 
     const [mapDist, setMapDist] = useState<number>(25);
 
+    const [mapExpanded, setMapExpanded] = useState<boolean>(false);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const stored = window.localStorage.getItem('mapExpanded');
+        if (stored != null) {
+            setMapExpanded(stored === 'true');
+        }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            window.localStorage.setItem('mapExpanded', mapExpanded ? 'true' : 'false');
+        } catch (err) {
+            // ignore
+        }
+    }, [mapExpanded]);
+
     const [page, setPage] = useState(0);
 
     const [pageRec, setPageRec] = useState(0);
@@ -197,6 +222,9 @@ export const BirdProvider: FC<BirdProviderProps> = ({
 
                 mapDist,
                 setMapDist,
+
+                mapExpanded,
+                setMapExpanded,
 
                 page,
                 setPage,

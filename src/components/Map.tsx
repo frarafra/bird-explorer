@@ -176,7 +176,7 @@ const MapResizeHandler = ({ expanded }: { expanded: boolean }) => {
 };
 
 const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId }) => {
-  const { setBirds, setBirdImages, setTaxonomies, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setObservations, speciesObserved, taxonomiesReady } = useContext(BirdContext);
+  const { setBirds, setTaxonomies, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setObservations, speciesObserved, taxonomiesReady, mapExpanded, setMapExpanded } = useContext(BirdContext);
   const [compareMode, setCompareMode] = useState(false);
   const [point1, setPoint1] = useState<{lat: number, lng: number, species: string[], locationName?: string} | null>(null);
   const [point2, setPoint2] = useState<{lat: number, lng: number, species: string[], locationName?: string} | null>(null);
@@ -184,7 +184,6 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
   const [showComparison, setShowComparison] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [locationQuery, setLocationQuery] = useState('');
   const [bounds, setBounds] = useState<[[number, number], [number, number]] | null>(null);
@@ -297,8 +296,8 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
       style={{
         position: 'relative',
         height: '100vh',
-        width: isMobile && isMapExpanded ? '94vw' : '100%',
-        marginLeft: isMobile && isMapExpanded
+        width: isMobile && mapExpanded ? '94vw' : '100%',
+        marginLeft: isMobile && mapExpanded
           ? 'calc(100% - 93vw)'
           : '0',
         overflow: 'hidden',
@@ -307,13 +306,13 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
       {isMobile && (
         <button
           type="button"
-          onClick={() => setIsMapExpanded((value) => !value)}
-          aria-label={isMapExpanded ? 'Collapse map width' : 'Expand map to full width'}
-          title={isMapExpanded ? 'Collapse map' : 'Expand map'}
+          onClick={() => setMapExpanded((value) => !value)}
+          aria-label={mapExpanded ? 'Collapse map width' : 'Expand map to full width'}
+          title={mapExpanded ? 'Collapse map' : 'Expand map'}
           className={`${mapButtonClass} left-[10px] top-[10px] bg-white text-slate-900 border-slate-200`}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            {isMapExpanded ? (
+            {mapExpanded ? (
               <>
                 <path d="M15 3h6v6" />
                 <path d="M14 10l7-7" />
@@ -339,7 +338,7 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
         zoomDelta={0.25}
         style={{ height: "100%", width: "100%" }}
       >
-        <MapResizeHandler expanded={isMapExpanded} />
+        <MapResizeHandler expanded={mapExpanded} />
         <ZoomControl position="bottomright" />
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
