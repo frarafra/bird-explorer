@@ -54,16 +54,12 @@ function createHttpClient() {
   return { client, jar };
 }
 
-function parseAnubisChallenge(
-  html: string,
-): AnubisChallenge | null {
+function parseAnubisChallenge(html: string): AnubisChallenge | null {
   const match = html.match(
     /<script\s+id=["']anubis_challenge["'][^>]*>([\s\S]*?)<\/script>/i,
   );
 
-  if (!match) {
-    return null;
-  }
+  if (!match) return null;
 
   try {
     return JSON.parse(match[1].trim());
@@ -73,30 +69,13 @@ function parseAnubisChallenge(
   }
 }
 
-function solveAnubisFast(
-  randomData: string,
-  difficulty: number,
-): {
-  nonce: number;
-  response: string;
-} {
+function solveAnubisFast(randomData: string, difficulty: number) {
   const prefix = '0'.repeat(difficulty);
-
   let nonce = 0;
 
   while (true) {
-    const response = crypto
-      .createHash('sha256')
-      .update(randomData + String(nonce))
-      .digest('hex');
-
-    if (response.startsWith(prefix)) {
-      return {
-        nonce,
-        response,
-      };
-    }
-
+    const response = crypto.createHash('sha256').update(randomData + String(nonce)).digest('hex');
+    if (response.startsWith(prefix)) return { nonce, response };
     nonce++;
   }
 }
@@ -106,39 +85,19 @@ async function solveAnubisChallenge(
   challenge: AnubisChallenge,
   redirectUrl: string,
 ) {
-  const {
-    id,
-    randomData,
-    difficulty,
-    method,
-  } = challenge.challenge;
+  const { id, randomData, difficulty, method } = challenge.challenge;
 
-  if (method !== 'fast') {
-    throw new Error(
-      `Unsupported Anubis challenge method: ${method}`,
-    );
-  }
+  if (method !== 'fast') throw new Error(`Unsupported Anubis challenge method: ${method}`);
 
-  console.log(
-    `Solving Anubis challenge ${id}, difficulty=${difficulty}`,
-  );
-
+  console.log(`Solving Anubis challenge ${id}, difficulty=${difficulty}`);
   const startedAt = Date.now();
 
-  const solved = solveAnubisFast(
-    randomData,
-    difficulty,
-  );
-
+  const solved = solveAnubisFast(randomData, difficulty);
   const elapsedTime = Date.now() - startedAt;
 
-  console.log(
-    `Anubis solved: nonce=${solved.nonce}, ` +
-    `elapsedTime=${elapsedTime}ms`,
-  );
+  console.log(`Anubis solved: nonce=${solved.nonce}, elapsedTime=${elapsedTime}ms`);
 
-  const challengeUrl =
-    'https://ebird.org/.within.website/x/cmd/anubis/api/pass-challenge';
+  const challengeUrl = 'https://ebird.org/.within.website/x/cmd/anubis/api/pass-challenge';
 
   const response = await client.get(challengeUrl, {
     params: {
@@ -150,31 +109,20 @@ async function solveAnubisChallenge(
     },
   });
 
-  console.log(
-    `Anubis pass-challenge response: ${response.status}`,
-  );
+  console.log(`Anubis pass-challenge response: ${response.status}`);
 
-  if (
-    response.status !== 200 &&
-    response.status !== 302 &&
-    response.status !== 303
-  ) {
-    throw new Error(
-      `Anubis challenge failed: HTTP ${response.status}`,
-    );
+  if (![200, 302, 303].includes(response.status)) {
+    throw new Error(`Anubis challenge failed: HTTP ${response.status}`);
   }
 
   return response;
 }
 
-const fetchEbirdSpeciesPage = async (
-  initialUrl: string,
-): Promise<string | null> => {
+const fetchEbirdSpeciesPage = async (initialUrl: string): Promise<string | null> => {
   const { client } = createHttpClient();
 
   let url = initialUrl;
   let redirectCount = 0;
-
   const maxRedirects = 10;
   let challengeAttempts = 0;
   const maxChallengeAttempts = 3;
@@ -182,40 +130,16 @@ const fetchEbirdSpeciesPage = async (
   try {
     while (redirectCount < maxRedirects) {
       const response = await client.get(url);
-
-      console.log(
-        `eBird GET ${url}: ${response.status}`,
-      );
+      console.log(`eBird GET ${url}: ${response.status}`);
 
       if (response.status === 200) {
-        if (
-          typeof response.data === 'string' &&
-          response.data.includes('id="anubis_challenge"')
-        ) {
-          const challenge = parseAnubisChallenge(
-            response.data,
-          );
-
-          if (!challenge) {
-            throw new Error(
-              'Anubis challenge detected but could not be parsed',
-            );
-          }
-
-          if (challengeAttempts >= maxChallengeAttempts) {
-            throw new Error(
-              'Maximum Anubis challenge attempts exceeded',
-            );
-          }
+        if (typeof response.data === 'string' && response.data.includes('id="anubis_challenge"')) {
+          const challenge = parseAnubisChallenge(response.data);
+          if (!challenge) throw new Error('Anubis challenge detected but could not be parsed');
+          if (challengeAttempts >= maxChallengeAttempts) throw new Error('Maximum Anubis challenge attempts exceeded');
 
           challengeAttempts++;
-
-          await solveAnubisChallenge(
-            client,
-            challenge,
-            initialUrl,
-          );
-
+          await solveAnubisChallenge(client, challenge, initialUrl);
           url = initialUrl;
           continue;
         }
@@ -223,281 +147,117 @@ const fetchEbirdSpeciesPage = async (
         return response.data;
       }
 
-      if (
-        response.status === 301 ||
-        response.status === 302 ||
-        response.status === 303 ||
-        response.status === 307 ||
-        response.status === 308
-      ) {
+      if ([301, 302, 303, 307, 308].includes(response.status)) {
         const redirectUrl = response.headers.location;
-
-        if (!redirectUrl) {
-          throw new Error(
-            `HTTP ${response.status} without Location header`,
-          );
-        }
-
-        url = new URL(
-          redirectUrl,
-          url,
-        ).href;
-
+        if (!redirectUrl) throw new Error(`HTTP ${response.status} without Location header`);
+        url = new URL(redirectUrl, url).href;
         redirectCount++;
         continue;
       }
 
-      if (
-        typeof response.data === 'string' &&
-        response.data.includes('id="anubis_challenge"')
-      ) {
-        const challenge = parseAnubisChallenge(
-          response.data,
-        );
-
-        if (!challenge) {
-          throw new Error(
-            'Anubis challenge detected but could not be parsed',
-          );
-        }
-
-        if (challengeAttempts >= maxChallengeAttempts) {
-          throw new Error(
-            'Maximum Anubis challenge attempts exceeded',
-          );
-        }
+      if (typeof response.data === 'string' && response.data.includes('id="anubis_challenge"')) {
+        const challenge = parseAnubisChallenge(response.data);
+        if (!challenge) throw new Error('Anubis challenge detected but could not be parsed');
+        if (challengeAttempts >= maxChallengeAttempts) throw new Error('Maximum Anubis challenge attempts exceeded');
 
         challengeAttempts++;
-
-        await solveAnubisChallenge(
-          client,
-          challenge,
-          initialUrl,
-        );
-
+        await solveAnubisChallenge(client, challenge, initialUrl);
         url = initialUrl;
         continue;
       }
 
-      throw new Error(
-        `Unexpected eBird response: HTTP ${response.status}`,
-      );
+      throw new Error(`Unexpected eBird response: HTTP ${response.status}`);
     }
 
     throw new Error('Too many eBird redirects');
   } catch (error) {
-    console.error(
-      'Error fetching eBird species page:',
-      error,
-    );
-
+    console.error('Error fetching eBird species page:', error);
     return null;
   }
 };
 
-const fetchImageUrl = async (
-  speciesCode: string,
-): Promise<string | null> => {
+const fetchImageUrl = async (speciesCode: string): Promise<string | null> => {
   const cacheKey = `${speciesCode}-img`;
-
   const cachedImageUrl = await redis.get(cacheKey);
-
-  if (cachedImageUrl) {
-    return JSON.parse(cachedImageUrl);
-  }
+  if (cachedImageUrl) return JSON.parse(cachedImageUrl);
 
   try {
     const url = `${EBIRD_SPECIES_URL}${speciesCode}`;
-
     const html = await fetchEbirdSpeciesPage(url);
-
     if (!html) {
-      console.warn(
-        `No HTML returned for species code: ${speciesCode}`,
-      );
-
+      console.warn(`No HTML returned for species code: ${speciesCode}`);
       return null;
     }
 
     const $ = cheerio.load(html);
-
     const imageElement = $('.Species-media-image');
-
     if (imageElement.length === 0) {
-      console.warn(
-        `No image found for species code: ${speciesCode}`,
-      );
-
+      console.warn(`No image found for species code: ${speciesCode}`);
       return null;
     }
 
-    const imageUrl =
-      imageElement.attr('src') || null;
+    const imageUrl = imageElement.attr('src') || null;
+    if (!imageUrl) return null;
 
-    if (!imageUrl) {
-      return null;
-    }
-
-    await redis.set(
-      cacheKey,
-      JSON.stringify(imageUrl),
-      'EX',
-      30 * 24 * 60 * 60,
-    );
-
+    await redis.set(cacheKey, JSON.stringify(imageUrl), 'EX', 30 * 24 * 60 * 60);
     return imageUrl;
   } catch (error) {
-    console.error(
-      `Error fetching image for species code ${speciesCode}:`,
-      error,
-    );
-
+    console.error(`Error fetching image for species code ${speciesCode}:`, error);
     return null;
   }
 };
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const fetchImagesInBatches = async (
   birds: Record<string, string>,
   batchSize: number,
   delayMs: number,
-): Promise<
-  Array<{
-    name: string;
-    imageUrl: string;
-  }>
-> => {
+): Promise<Array<{ name: string; imageUrl: string }>> => {
   const birdEntries = Object.entries(birds);
+  let results: Array<{ name: string; imageUrl: string }> = [];
 
-  let results: Array<{
-    name: string;
-    imageUrl: string;
-  }> = [];
+  for (let i = 0; i < birdEntries.length; i += batchSize) {
+    const batch = birdEntries.slice(i, i + batchSize);
 
-  for (
-    let i = 0;
-    i < birdEntries.length;
-    i += batchSize
-  ) {
-    const batch = birdEntries.slice(
-      i,
-      i + batchSize,
-    );
+    const dataPromises = batch.map(async ([name, speciesCode]) => {
+      const imageUrl = await fetchImageUrl(speciesCode);
+      return { name, imageUrl };
+    });
 
-    const dataPromises = batch.map(
-      async ([name, speciesCode]) => {
-        const imageUrl =
-          await fetchImageUrl(speciesCode);
+    const resultsBatch = await Promise.allSettled(dataPromises);
 
-        return {
-          name,
-          imageUrl,
-        };
-      },
-    );
+    const successfulResults: Array<{ name: string; imageUrl: string }> = resultsBatch
+      .filter((result): result is PromiseFulfilledResult<{ name: string; imageUrl: string | null }> => result.status === 'fulfilled')
+      .filter((result) => result.value.imageUrl !== null)
+      .map((result) => ({ name: result.value.name, imageUrl: result.value.imageUrl as string }));
 
-    const resultsBatch =
-      await Promise.allSettled(
-        dataPromises,
-      );
+    results = results.concat(successfulResults);
 
-    const successfulResults: Array<{
-      name: string;
-      imageUrl: string;
-    }> = resultsBatch
-      .filter(
-        (
-          result,
-        ): result is PromiseFulfilledResult<{
-          name: string;
-          imageUrl: string | null;
-        }> => result.status === 'fulfilled',
-      )
-      .filter(
-        (result) => result.value.imageUrl !== null,
-      )
-      .map((result) => ({
-        name: result.value.name,
-        imageUrl: result.value.imageUrl as string,
-      }));
-
-    results = results.concat(
-      successfulResults,
-    );
-
-    if (
-      i + batchSize <
-      birdEntries.length
-    ) {
-      await delay(delayMs);
-    }
+    if (i + batchSize < birdEntries.length) await delay(delayMs);
   }
 
   return results;
 };
 
-export async function getBirdImages(
-  birds: Record<string, string>,
-) {
-  const batchConcSize =
-    Number(
-      process.env
-        .NEXT_PUBLIC_BATCH_CONC_SIZE,
-    ) || 2;
-
-  const delayMs =
-    Number(
-      process.env
-        .NEXT_PUBLIC_DELAY_BETWEEN_BATCHES_MS,
-    ) || 1000;
-
-  return fetchImagesInBatches(
-    birds,
-    batchConcSize,
-    delayMs,
-  );
+export async function getBirdImages(birds: Record<string, string>) {
+  const batchConcSize = Number(process.env.NEXT_PUBLIC_BATCH_CONC_SIZE) || 2;
+  const delayMs = Number(process.env.NEXT_PUBLIC_DELAY_BETWEEN_BATCHES_MS) || 1000;
+  return fetchImagesInBatches(birds, batchConcSize, delayMs);
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse,
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method !== 'POST') {
-      res.setHeader(
-        'Allow',
-        ['POST'],
-      );
-
-      return res
-        .status(405)
-        .end(
-          `Method ${req.method} Not Allowed`,
-        );
+      res.setHeader('Allow', ['POST']);
+      return res.status(405).end(`Method ${req.method} Not Allowed`);
     }
 
-    const successfulResults =
-      await getBirdImages(req.body);
-
-    console.log(
-      'Fetched image results:',
-      successfulResults,
-    );
-
-    return res
-      .status(200)
-      .json(successfulResults);
+    const successfulResults = await getBirdImages(req.body);
+    console.log('Fetched image results:', successfulResults);
+    return res.status(200).json(successfulResults);
   } catch (error) {
-    console.error(
-      'Error in /api/ebirdImages:',
-      error,
-    );
-
-    return res
-      .status(500)
-      .json({
-        error: 'Internal Server Error',
-      });
+    console.error('Error in /api/ebirdImages:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 }
