@@ -231,11 +231,50 @@ const fetchImagesInBatches = async (
   return results;
 };
 
-export async function getBirdImages(birds: Record<string, string>) {
-  const batchConcSize = Number(process.env.NEXT_PUBLIC_BATCH_CONC_SIZE) || 2;
-  const delayMs = Number(process.env.NEXT_PUBLIC_DELAY_BETWEEN_BATCHES_MS) || 1000;
+export async function getBirdImages(
+  birds: Record<string, string>,
+) {
+  const entries = Object.entries(birds);
 
-  return fetchImagesInBatches(birds, batchConcSize, delayMs);
+  const keys = entries.map(
+    ([, speciesCode]) => `${speciesCode}-img`,
+  );
+
+  const cachedValues = await redis.mget(keys);
+
+  const results: Array<{ name: string; imageUrl: string }> = [];
+  const missing: Array<[string, string]> = [];
+
+  entries.forEach(([name, speciesCode], index) => {
+    const cached = cachedValues[index];
+
+    if (cached) {
+      results.push({
+        name,
+        imageUrl: JSON.parse(cached),
+      });
+    } else {
+      missing.push([name, speciesCode]);
+    }
+  });
+
+  console.log(
+    `Redis: ${results.length} hits, ${missing.length} misses`,
+  );
+
+  if (missing.length > 0) {
+    const missingBirds = Object.fromEntries(missing);
+
+    const fetched = await fetchImagesInBatches(
+      missingBirds,
+      2,
+      1000,
+    );
+
+    results.push(...fetched);
+  }
+
+  return results;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -246,7 +285,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const successfulResults = await getBirdImages(req.body);
-    console.log('Fetched image results:', successfulResults);
+    //console.log('Fetched image results:', successfulResults);
 
     return res.status(200).json(successfulResults);
   } catch (error) {
