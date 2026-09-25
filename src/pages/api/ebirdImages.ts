@@ -10,6 +10,25 @@ import { EBIRD_SPECIES_URL } from '../../components/SearchResults';
 
 const redis = getRedisClient();
 
+const cookieJar = new CookieJar();
+
+const ebirdClient = wrapper(
+  axios.create({
+    jar: cookieJar,
+    withCredentials: true,
+    maxRedirects: 0,
+    validateStatus: () => true,
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (X11; Ubuntu; Linux x86_64) ' +
+        'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+        'Chrome/153.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  }),
+);
+
 interface AnubisChallenge {
   rules: {
     algorithm: string;
@@ -30,35 +49,8 @@ interface AnubisChallenge {
   };
 }
 
-function createHttpClient() {
-  const jar = new CookieJar();
-
-  const client = wrapper(
-    axios.create({
-      jar,
-      withCredentials: true,
-      maxRedirects: 0,
-      validateStatus: () => true,
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (X11; Ubuntu; Linux x86_64) ' +
-          'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-          'Chrome/153.0.0.0 Safari/537.36',
-        Accept:
-          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-    }),
-  );
-
-  return { client, jar };
-}
-
 function parseAnubisChallenge(html: string): AnubisChallenge | null {
-  const match = html.match(
-    /<script\s+id=["']anubis_challenge["'][^>]*>([\s\S]*?)<\/script>/i,
-  );
-
+  const match = html.match(/<script\s+id=["']anubis_challenge["'][^>]*>([\s\S]*?)<\/script>/i);
   if (!match) return null;
 
   try {
@@ -80,18 +72,13 @@ function solveAnubisFast(randomData: string, difficulty: number) {
   }
 }
 
-async function solveAnubisChallenge(
-  client: ReturnType<typeof createHttpClient>['client'],
-  challenge: AnubisChallenge,
-  redirectUrl: string,
-) {
+async function solveAnubisChallenge(challenge: AnubisChallenge, redirectUrl: string) {
   const { id, randomData, difficulty, method } = challenge.challenge;
-
   if (method !== 'fast') throw new Error(`Unsupported Anubis challenge method: ${method}`);
 
   console.log(`Solving Anubis challenge ${id}, difficulty=${difficulty}`);
-  const startedAt = Date.now();
 
+  const startedAt = Date.now();
   const solved = solveAnubisFast(randomData, difficulty);
   const elapsedTime = Date.now() - startedAt;
 
@@ -99,7 +86,7 @@ async function solveAnubisChallenge(
 
   const challengeUrl = 'https://ebird.org/.within.website/x/cmd/anubis/api/pass-challenge';
 
-  const response = await client.get(challengeUrl, {
+  const response = await ebirdClient.get(challengeUrl, {
     params: {
       id,
       response: solved.response,
@@ -119,8 +106,6 @@ async function solveAnubisChallenge(
 }
 
 const fetchEbirdSpeciesPage = async (initialUrl: string): Promise<string | null> => {
-  const { client } = createHttpClient();
-
   let url = initialUrl;
   let redirectCount = 0;
   const maxRedirects = 10;
@@ -129,7 +114,7 @@ const fetchEbirdSpeciesPage = async (initialUrl: string): Promise<string | null>
 
   try {
     while (redirectCount < maxRedirects) {
-      const response = await client.get(url);
+      const response = await ebirdClient.get(url);
       console.log(`eBird GET ${url}: ${response.status}`);
 
       if (response.status === 200) {
@@ -139,7 +124,7 @@ const fetchEbirdSpeciesPage = async (initialUrl: string): Promise<string | null>
           if (challengeAttempts >= maxChallengeAttempts) throw new Error('Maximum Anubis challenge attempts exceeded');
 
           challengeAttempts++;
-          await solveAnubisChallenge(client, challenge, initialUrl);
+          await solveAnubisChallenge(challenge, initialUrl);
           url = initialUrl;
           continue;
         }
@@ -150,6 +135,7 @@ const fetchEbirdSpeciesPage = async (initialUrl: string): Promise<string | null>
       if ([301, 302, 303, 307, 308].includes(response.status)) {
         const redirectUrl = response.headers.location;
         if (!redirectUrl) throw new Error(`HTTP ${response.status} without Location header`);
+
         url = new URL(redirectUrl, url).href;
         redirectCount++;
         continue;
@@ -161,7 +147,7 @@ const fetchEbirdSpeciesPage = async (initialUrl: string): Promise<string | null>
         if (challengeAttempts >= maxChallengeAttempts) throw new Error('Maximum Anubis challenge attempts exceeded');
 
         challengeAttempts++;
-        await solveAnubisChallenge(client, challenge, initialUrl);
+        await solveAnubisChallenge(challenge, initialUrl);
         url = initialUrl;
         continue;
       }
@@ -182,8 +168,7 @@ const fetchImageUrl = async (speciesCode: string): Promise<string | null> => {
   if (cachedImageUrl) return JSON.parse(cachedImageUrl);
 
   try {
-    const url = `${EBIRD_SPECIES_URL}${speciesCode}`;
-    const html = await fetchEbirdSpeciesPage(url);
+    const html = await fetchEbirdSpeciesPage(`${EBIRD_SPECIES_URL}${speciesCode}`);
     if (!html) {
       console.warn(`No HTML returned for species code: ${speciesCode}`);
       return null;
@@ -191,6 +176,7 @@ const fetchImageUrl = async (speciesCode: string): Promise<string | null> => {
 
     const $ = cheerio.load(html);
     const imageElement = $('.Species-media-image');
+
     if (imageElement.length === 0) {
       console.warn(`No image found for species code: ${speciesCode}`);
       return null;
@@ -220,6 +206,8 @@ const fetchImagesInBatches = async (
   for (let i = 0; i < birdEntries.length; i += batchSize) {
     const batch = birdEntries.slice(i, i + batchSize);
 
+    console.log(`Processing batch ${Math.floor(i / batchSize) + 1} / ${Math.ceil(birdEntries.length / batchSize)}`);
+
     const dataPromises = batch.map(async ([name, speciesCode]) => {
       const imageUrl = await fetchImageUrl(speciesCode);
       return { name, imageUrl };
@@ -227,8 +215,11 @@ const fetchImagesInBatches = async (
 
     const resultsBatch = await Promise.allSettled(dataPromises);
 
-    const successfulResults: Array<{ name: string; imageUrl: string }> = resultsBatch
-      .filter((result): result is PromiseFulfilledResult<{ name: string; imageUrl: string | null }> => result.status === 'fulfilled')
+    const successfulResults = resultsBatch
+      .filter(
+        (result): result is PromiseFulfilledResult<{ name: string; imageUrl: string | null }> =>
+          result.status === 'fulfilled',
+      )
       .filter((result) => result.value.imageUrl !== null)
       .map((result) => ({ name: result.value.name, imageUrl: result.value.imageUrl as string }));
 
@@ -243,6 +234,7 @@ const fetchImagesInBatches = async (
 export async function getBirdImages(birds: Record<string, string>) {
   const batchConcSize = Number(process.env.NEXT_PUBLIC_BATCH_CONC_SIZE) || 2;
   const delayMs = Number(process.env.NEXT_PUBLIC_DELAY_BETWEEN_BATCHES_MS) || 1000;
+
   return fetchImagesInBatches(birds, batchConcSize, delayMs);
 }
 
@@ -255,6 +247,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const successfulResults = await getBirdImages(req.body);
     console.log('Fetched image results:', successfulResults);
+
     return res.status(200).json(successfulResults);
   } catch (error) {
     console.error('Error in /api/ebirdImages:', error);
