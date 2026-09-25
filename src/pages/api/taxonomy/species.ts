@@ -7,35 +7,77 @@ const redis = getRedisClient();
 const EBIRD_TAXONOMY_API_URL = 'https://api.ebird.org/v2/ref/taxonomy/ebird?fmt=json&species=';
 
 async function ebirdTaxonomySearch(speciesCodes: string[]) {
-    const parsePromises = speciesCodes.map(async(speciesCode) => {
-        const cachedBirdFamily = await redis.get(`${speciesCode}-family`);
+    const uniqueSpeciesCodes = [...new Set(speciesCodes)];
 
-        if (cachedBirdFamily) {
-            return JSON.parse(cachedBirdFamily); 
-        }
+    const cacheKeys = uniqueSpeciesCodes.map(
+        (speciesCode) => `${speciesCode}-family`
+    );
 
-        const response = await fetch(`${EBIRD_TAXONOMY_API_URL}${speciesCode}`);
+    const cachedFamilies = await redis.mget(cacheKeys);
 
-        const birdTaxon = await response.json();
+    const taxonomies: Record<string, string> = {};
+    const missingSpeciesCodes: string[] = [];
 
-        return birdTaxon?.[0]?.familyComName;
-    });
+    uniqueSpeciesCodes.forEach((speciesCode, index) => {
+        const cachedFamily = cachedFamilies[index];
 
-    const results = await Promise.allSettled(parsePromises);
-
-    let taxonomies: Record<string, string> = {};    
-    results.forEach(async (result, index) => {
-        if (result.status === 'fulfilled') {
-            const birdFamily = result.value as string;
-
-            taxonomies[speciesCodes[index]] = birdFamily;
-            await redis.set(`${speciesCodes[index]}-family`, JSON.stringify(taxonomies[speciesCodes[index]]), 
-                    'EX', 30 * 24 * 60 * 60);
-
-        } else if (result.status === 'rejected') {
-            console.error(`Failed to fetch taxonomy for species code ${speciesCodes[index]}:`, result.reason);
+        if (cachedFamily) {
+            taxonomies[speciesCode] = JSON.parse(cachedFamily);
+        } else {
+            missingSpeciesCodes.push(speciesCode);
         }
     });
+
+    const fetchResults = await Promise.allSettled(
+        missingSpeciesCodes.map(async (speciesCode) => {
+            const response = await fetch(
+                `${EBIRD_TAXONOMY_API_URL}${speciesCode}`
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    `eBird API returned ${response.status} for ${speciesCode}`
+                );
+            }
+
+            const birdTaxon = await response.json();
+            const birdFamily = birdTaxon?.[0]?.familyComName;
+
+            if (!birdFamily) {
+                throw new Error(
+                    `No family found for species code ${speciesCode}`
+                );
+            }
+
+            return {
+                speciesCode,
+                birdFamily,
+            };
+        })
+    );
+
+    await Promise.all(
+        fetchResults.map(async (result) => {
+            if (result.status !== 'fulfilled') {
+                console.error(
+                    'Failed to fetch taxonomy:',
+                    result.reason
+                );
+                return;
+            }
+
+            const { speciesCode, birdFamily } = result.value;
+
+            taxonomies[speciesCode] = birdFamily;
+
+            await redis.set(
+                `${speciesCode}-family`,
+                JSON.stringify(birdFamily),
+                'EX',
+                30 * 24 * 60 * 60
+            );
+        })
+    );
 
     return taxonomies;
 }
