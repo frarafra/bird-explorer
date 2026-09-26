@@ -606,7 +606,6 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
                     setTaxonomies({});
                     setObservations([]);
                     setMapCenter({ lat: parsedLat, lng: parsedLng });
-                    setMapDist(25);
                     setMapZoom(12);
                     setShowLocationSearch(false);
                     setLocationQuery('');

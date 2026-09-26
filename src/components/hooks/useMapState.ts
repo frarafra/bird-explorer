@@ -15,17 +15,10 @@ const useMapState = (
     const zoom = map.getZoom();
     const bounds = map.getBounds();
     const radiusMeters = map.distance(center, bounds.getNorthEast());
-    const rawDist = Math.max(
+    const dist = Math.max(
       5,
       Math.ceil(radiusMeters / 1000)
     );
-    const prevDist = previousDistRef.current ?? rawDist;
-    const dist = Math.max(
-      5,
-      Math.round(prevDist * 0.6 + rawDist * 0.4)
-    );
-
-    previousDistRef.current = dist;
 
     onMoveEnd({
       lat: center.lat,
