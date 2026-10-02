@@ -44,7 +44,7 @@ const useMapState = (
     setMapDist(dist);
 
     return {
-      center: roundedCenter,
+      center,
       zoom,
       dist,
     };
