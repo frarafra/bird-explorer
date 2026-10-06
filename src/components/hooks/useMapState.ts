@@ -29,8 +29,8 @@ const useMapState = (
 
     const hasCenterChanged =
       !lastCenterRef.current ||
-      lastCenterRef.current.lat !== roundedCenter.lat ||
-      lastCenterRef.current.lng !== roundedCenter.lng;
+      Math.abs(lastCenterRef.current.lat - roundedCenter.lat) > 0.001 ||
+      Math.abs(lastCenterRef.current.lng - roundedCenter.lng) > 0.001;
 
     if (hasCenterChanged) {
       onMoveEnd({

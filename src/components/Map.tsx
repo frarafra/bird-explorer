@@ -134,7 +134,16 @@ const MapEventsHandler = ({
 const UpdateMapView = ({ lat, lng, zoom }: { lat: number; lng: number; zoom: number }) => {
   const map = useMap();
   useEffect(() => {
-    map.setView([lat, lng], zoom);
+    const currentCenter = map.getCenter();
+    const currentZoom = map.getZoom();
+    const centerDiff =
+      Math.abs(currentCenter.lat - lat) > 0.001 ||
+      Math.abs(currentCenter.lng - lng) > 0.001;
+    const zoomDiff = Math.abs(currentZoom - zoom) > 1e-3;
+
+    if (centerDiff || zoomDiff) {
+      map.setView([lat, lng], zoom);
+    }
   }, [lat, lng, zoom, map]);
   return null;
 };
