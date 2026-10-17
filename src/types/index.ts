@@ -32,6 +32,7 @@ export interface Hotspot {
   lat: number;
   lng: number;
   latestObsDt: string;
+  subnational1Code?: string;
 }
 
 export interface MapEventsHandlerProps {
@@ -39,4 +40,5 @@ export interface MapEventsHandlerProps {
   onHotspotsChanged: (hotspots: Hotspot[]) => void;
   setMapDist: (dist: number) => void;
   setMapZoom: (zoom: number) => void;
+  setMapBounds: (bounds: { north: number; south: number; east: number; west: number }) => void;
 }

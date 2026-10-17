@@ -88,6 +88,7 @@ const MapEventsHandler = ({
   onHotspotsChanged,
   setMapDist,
   setMapZoom,
+  setMapBounds,
 }: MapEventsHandlerProps) => {
   const map = useMap();
 
@@ -105,6 +106,13 @@ const MapEventsHandler = ({
   useEffect(() => {
     const update = () => {
       const { center, zoom, dist } = getMapState();
+      const bounds = map.getBounds();
+      setMapBounds({
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest(),
+      });
       fetchHotspots(center, zoom, dist);
     };
 
@@ -185,7 +193,7 @@ const MapResizeHandler = ({ expanded }: { expanded: boolean }) => {
 };
 
 const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId }) => {
-  const { setBirds, setTaxonomies, setMapCenter, mapDist, setMapDist, mapZoom, setMapZoom, setObservations, speciesObserved, taxonomiesReady, mapExpanded, setMapExpanded } = useContext(BirdContext);
+  const { setBirds, setTaxonomies, setMapCenter, setMapBounds, mapDist, setMapDist, mapZoom, setMapZoom, setObservations, speciesObserved, taxonomiesReady, mapExpanded, setMapExpanded, setHotspotSubnationalCodes } = useContext(BirdContext);
   const [compareMode, setCompareMode] = useState(false);
   const [point1, setPoint1] = useState<{lat: number, lng: number, species: string[], locationName?: string} | null>(null);
   const [point2, setPoint2] = useState<{lat: number, lng: number, species: string[], locationName?: string} | null>(null);
@@ -197,6 +205,18 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
   const [locationQuery, setLocationQuery] = useState('');
   const [bounds, setBounds] = useState<[[number, number], [number, number]] | null>(null);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
+
+  useEffect(() => {
+    const distinctSubnationalCodes = Array.from(
+      new Set(
+        hotspots
+          .map((hotspot) => hotspot.subnational1Code)
+          .filter((code): code is string => Boolean(code))
+      )
+    );
+
+    setHotspotSubnationalCodes(distinctSubnationalCodes);
+  }, [hotspots, setHotspotSubnationalCodes]);
 
   const observations = speciesObserved ?? [];
 
@@ -376,6 +396,7 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
           }
           setMapDist={setMapDist}
           setMapZoom={setMapZoom}
+          setMapBounds={setMapBounds}
         />
 
         {!compareMode && routeVisible && (

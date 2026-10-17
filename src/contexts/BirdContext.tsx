@@ -33,6 +33,9 @@ interface BirdContextType {
     mapCenter: MapCenter;
     setMapCenter: React.Dispatch<React.SetStateAction<MapCenter>>;
 
+    mapBounds: { north: number; south: number; east: number; west: number };
+    setMapBounds: React.Dispatch<React.SetStateAction<{ north: number; south: number; east: number; west: number }>>;
+
     mapZoom: number;
     setMapZoom: React.Dispatch<React.SetStateAction<number>>;
         
@@ -60,6 +63,9 @@ interface BirdContextType {
 
     selectedSpecies: string;
     setSelectedSpecies: React.Dispatch<React.SetStateAction<string>>;
+
+    hotspotSubnationalCodes: string[];
+    setHotspotSubnationalCodes: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 export const BirdContext = createContext<BirdContextType>({
@@ -89,6 +95,14 @@ export const BirdContext = createContext<BirdContextType>({
     },
     setMapCenter: () => {},
 
+    mapBounds: {
+        north: 0,
+        south: 0,
+        east: 0,
+        west: 0,
+    },
+    setMapBounds: () => {},
+
     mapZoom: 10,
     setMapZoom: () => {},
 
@@ -108,7 +122,10 @@ export const BirdContext = createContext<BirdContextType>({
     setSelectedGroup: () => {},
 
     selectedSpecies: 'All Species',
-    setSelectedSpecies: () => {}
+    setSelectedSpecies: () => {},
+
+    hotspotSubnationalCodes: [],
+    setHotspotSubnationalCodes: () => {}
 });
 
 interface BirdProviderProps {
@@ -146,6 +163,9 @@ export const BirdProvider: FC<BirdProviderProps> = ({
     const [selectedSpecies, setSelectedSpecies] =
         useState<string>('All Species');
 
+    const [hotspotSubnationalCodes, setHotspotSubnationalCodes] =
+        useState<string[]>([]);
+
     const [mapCenter, setMapCenter] = useState<MapCenter>({
         lat: parseFloat(
             process.env.NEXT_PUBLIC_LAT || '0'
@@ -153,6 +173,12 @@ export const BirdProvider: FC<BirdProviderProps> = ({
         lng: parseFloat(
             process.env.NEXT_PUBLIC_LNG || '0'
         )
+    });
+    const [mapBounds, setMapBounds] = useState({
+        north: 0,
+        south: 0,
+        east: 0,
+        west: 0,
     });
     const [taxonomiesReady, setTaxonomiesReady] = useState<boolean>(false);
 
@@ -217,6 +243,9 @@ export const BirdProvider: FC<BirdProviderProps> = ({
                 mapCenter,
                 setMapCenter,
 
+                mapBounds,
+                setMapBounds,
+
                 mapZoom,
                 setMapZoom,     
 
@@ -239,7 +268,10 @@ export const BirdProvider: FC<BirdProviderProps> = ({
                 setSelectedGroup,
 
                 selectedSpecies,
-                setSelectedSpecies
+                setSelectedSpecies,
+
+                hotspotSubnationalCodes,
+                setHotspotSubnationalCodes
             }}
         >
             {children}

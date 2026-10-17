@@ -1,0 +1,281 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+export type HistoricBird = {
+  name: string;
+  speciesCode: string;
+};
+
+type UseBirdHistoricProps = {
+  selectedDates: string[];
+  hotspotSubnationalCodes: string[];
+  mapBounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  };
+  birds: Record<string, string>;
+  speciesObserved: any[];
+  taxonomies: Record<string, string>;
+  contextTaxonomies: Record<string, string>;
+  setTaxonomies: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+};
+
+export const useBirdHistoric = ({
+  selectedDates,
+  hotspotSubnationalCodes,
+  mapBounds,
+  birds,
+  speciesObserved,
+  taxonomies,
+  contextTaxonomies,
+  setTaxonomies,
+}: UseBirdHistoricProps) => {
+  const [historicBirdsByDate, setHistoricBirdsByDate] = useState<
+    Record<string, HistoricBird[]>
+  >({});
+
+  const requestedDatesRef = useRef(new Set<string>());
+  const taxonomyRequestRef = useRef(new Set<string>());
+
+  const fetchMissingTaxonomies = useCallback(
+    async (speciesCodes: string[]) => {
+      const missingCodes = Array.from(
+        new Set(
+          speciesCodes.filter(
+            (speciesCode) =>
+              speciesCode &&
+              !(speciesCode in contextTaxonomies) &&
+              !taxonomyRequestRef.current.has(speciesCode)
+          )
+        )
+      );
+
+      if (!missingCodes.length) {
+        return;
+      }
+
+      missingCodes.forEach((speciesCode) => {
+        taxonomyRequestRef.current.add(speciesCode);
+      });
+
+      try {
+        const params = new URLSearchParams({
+          speciesCodes: missingCodes.join(','),
+        });
+
+        const response = await fetch(
+          `/api/taxonomy/species?${params.toString()}`
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch taxonomies: ${response.statusText}`
+          );
+        }
+
+        const nextTaxonomies = await response.json();
+
+        if (nextTaxonomies && typeof nextTaxonomies === 'object') {
+          setTaxonomies((prevTaxonomies) => ({
+            ...prevTaxonomies,
+            ...nextTaxonomies,
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching missing taxonomies:', error);
+      } finally {
+        missingCodes.forEach((speciesCode) => {
+          taxonomyRequestRef.current.delete(speciesCode);
+        });
+      }
+    },
+    [contextTaxonomies, setTaxonomies]
+  );
+
+  useEffect(() => {
+    if (!selectedDates.length || !hotspotSubnationalCodes.length) {
+      setHistoricBirdsByDate({});
+      requestedDatesRef.current.clear();
+      return;
+    }
+
+    let cancelled = false;
+
+    const datesToFetch = selectedDates.filter(
+      (date) => !requestedDatesRef.current.has(date)
+    );
+
+    if (!datesToFetch.length) {
+      return;
+    }
+
+    datesToFetch.forEach((date) => {
+      requestedDatesRef.current.add(date);
+    });
+
+    const loadHistoricBirds = async () => {
+      try {
+        const results = await Promise.allSettled(
+          datesToFetch.map(async (date) => {
+            const params = new URLSearchParams({
+              date,
+              north: String(mapBounds.north),
+              south: String(mapBounds.south),
+              east: String(mapBounds.east),
+              west: String(mapBounds.west),
+            });
+
+            hotspotSubnationalCodes.forEach((subnationalCode) => {
+              params.append('subnationalCode', subnationalCode);
+            });
+
+            const response = await fetch(
+              `/api/ebirdHistoricSpeciesSearch?${params.toString()}`
+            );
+
+            if (!response.ok) {
+              throw new Error(
+                `Historic fetch failed for ${hotspotSubnationalCodes.join(', ')} on ${date}`
+              );
+            }
+
+            const observations = await response.json();
+            const birdsForDate = (Array.isArray(observations) ? observations : [])
+              .map((observation: any) => ({
+                name:
+                  observation?.comName ||
+                  observation?.sciName ||
+                  observation?.speciesCode ||
+                  '',
+                speciesCode: observation?.speciesCode || '',
+              }))
+              .filter((bird) => bird.name || bird.speciesCode);
+
+            const dedupedBirds = new Map<string, HistoricBird>();
+
+            birdsForDate.forEach((bird) => {
+              const key = bird.speciesCode || bird.name.toLowerCase();
+
+              if (!dedupedBirds.has(key)) {
+                dedupedBirds.set(key, bird);
+              }
+            });
+
+            return [date, Array.from(dedupedBirds.values())] as const;
+          })
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        const successfulResults = results.filter(
+          (
+            result
+          ): result is PromiseFulfilledResult<
+            readonly [string, HistoricBird[]]
+          > => result.status === 'fulfilled'
+        );
+
+        results.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            requestedDatesRef.current.delete(datesToFetch[index]);
+          }
+        });
+
+        if (successfulResults.length > 0) {
+          setHistoricBirdsByDate((previous) => ({
+            ...previous,
+            ...Object.fromEntries(successfulResults.map((result) => result.value)),
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to load historical birds:', error);
+      } finally {
+        if (cancelled) {
+          datesToFetch.forEach((date) => {
+            requestedDatesRef.current.delete(date);
+          });
+        }
+      }
+    };
+
+    void loadHistoricBirds();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedDates,
+    hotspotSubnationalCodes,
+    mapBounds.north,
+    mapBounds.south,
+    mapBounds.east,
+    mapBounds.west,
+  ]);
+
+  const allHistoricBirds = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          Object.values(historicBirdsByDate)
+            .flat()
+            .map((bird) => {
+              const speciesKey = bird.speciesCode || bird.name.toLowerCase();
+              return [speciesKey, bird] as const;
+            })
+        ).values()
+      ),
+    [historicBirdsByDate]
+  );
+
+  const historicSpeciesLookup = useMemo(() => {
+    const map = new Map<string, string>();
+
+    Object.entries(birds).forEach(([name, speciesCode]) => {
+      if (name) {
+        map.set(name.trim().toLowerCase(), speciesCode);
+      }
+    });
+
+    speciesObserved.forEach((obs: any) => {
+      if (obs?.speciesCode) {
+        if (obs?.comName) {
+          map.set(obs.comName.trim().toLowerCase(), obs.speciesCode);
+        }
+
+        if (obs?.sciName) {
+          map.set(obs.sciName.trim().toLowerCase(), obs.speciesCode);
+        }
+      }
+    });
+
+    return map;
+  }, [birds, speciesObserved]);
+
+  useEffect(() => {
+    const missingSpeciesCodes = Array.from(
+      new Set(
+        [...Object.values(birds), ...allHistoricBirds.map((bird) => bird.speciesCode)]
+          .filter(
+            (speciesCode): speciesCode is string =>
+              Boolean(speciesCode) && !(speciesCode in contextTaxonomies)
+          )
+      )
+    );
+
+    if (!missingSpeciesCodes.length) {
+      return;
+    }
+
+    void fetchMissingTaxonomies(missingSpeciesCodes);
+  }, [allHistoricBirds, birds, contextTaxonomies, fetchMissingTaxonomies]);
+
+  return {
+    historicBirdsByDate,
+    allHistoricBirds,
+    historicSpeciesLookup,
+    effectiveTaxonomies: { ...taxonomies, ...contextTaxonomies },
+  };
+};
