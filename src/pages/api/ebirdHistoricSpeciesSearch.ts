@@ -39,6 +39,40 @@ const parseBounds = (req: NextApiRequest): HistoricBounds => {
   };
 };
 
+const filterObservationsByBounds = (
+  observations: any[],
+  north?: number,
+  south?: number,
+  east?: number,
+  west?: number
+) => {
+  const bounds = [north, south, east, west].map((value) => Number(value));
+  const hasBounds = bounds.every((value) => Number.isFinite(value));
+
+  if (!hasBounds) {
+    return observations;
+  }
+
+  const minLat = Math.min(north!, south!);
+  const maxLat = Math.max(north!, south!);
+  const minLng = Math.min(west!, east!);
+  const maxLng = Math.max(west!, east!);
+
+  return observations.filter((observation: any) => {
+    const lat = Number(observation?.lat);
+    const lng = Number(observation?.lng);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return false;
+    }
+
+    const latInBounds = lat >= minLat && lat <= maxLat;
+    const lngInBounds = lng >= minLng && lng <= maxLng;
+
+    return latInBounds && lngInBounds;
+  });
+};
+
 async function fetchHistoricSpecies({
   subnationalCode,
   locId,
@@ -78,33 +112,11 @@ async function fetchHistoricSpecies({
   const data = await response.json();
   const observations = Array.isArray(data) ? data : [];
 
-  const bounds = [north, south, east, west].map((value) => Number(value));
-  const hasBounds = bounds.every((value) => Number.isFinite(value));
-
-  if (!hasBounds) {
-    return data;
+  if (!subnationalCode) {
+    return observations;
   }
 
-  const minLat = Math.min(north!, south!);
-  const maxLat = Math.max(north!, south!);
-  const minLng = Math.min(west!, east!);
-  const maxLng = Math.max(west!, east!);
-
-  const filteredObservations = observations.filter((observation: any) => {
-    const lat = Number(observation?.lat);
-    const lng = Number(observation?.lng);
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return false;
-    }
-
-    const latInBounds = lat >= minLat && lat <= maxLat;
-    const lngInBounds = lng >= minLng && lng <= maxLng;
-
-    return latInBounds && lngInBounds;
-  });
-
-  return filteredObservations;
+  return filterObservationsByBounds(observations, north, south, east, west);
 }
 
 const getSubnationalCodes = (req: NextApiRequest) => {
@@ -156,37 +168,65 @@ export default async function handler(
   }
 
   try {
+    const seenLocIds = new Set<string>();
+
     const subnationalResults = await Promise.allSettled(
-      subnationalCodes.map((subnationalCode) =>
-        fetchHistoricSpecies({
+      subnationalCodes.map(async (subnationalCode) => {
+        const observations = await fetchHistoricSpecies({
           subnationalCode,
           date: rawDate,
           ...bounds,
-        })
-      )
+        });
+
+        const locIds = Array.from(
+          new Set(
+            getLocIdsFromHistoricResults([
+              {
+                status: 'fulfilled',
+                value: observations,
+              },
+            ])
+          )
+        ).filter((locId) => {
+          if (seenLocIds.has(locId)) {
+            return false;
+          }
+
+          seenLocIds.add(locId);
+          return true;
+        });
+
+        const locResults = locIds.length
+          ? await Promise.allSettled(
+              locIds.map((locId) =>
+                fetchHistoricSpecies({
+                  locId,
+                  date: rawDate,
+                  ...bounds,
+                })
+              )
+            )
+          : [];
+
+        return [
+          ...observations,
+          ...locResults.flatMap((result) =>
+            result.status === 'fulfilled'
+              ? Array.isArray(result.value)
+                ? result.value
+                : []
+              : []
+          ),
+        ];
+      })
     );
 
-    const locIds = getLocIdsFromHistoricResults(subnationalResults);
-
-    const locResults = locIds.length
-      ? await Promise.allSettled(
-          locIds.map((locId) =>
-            fetchHistoricSpecies({
-              locId,
-              date: rawDate,
-              ...bounds,
-            })
-          )
-        )
-      : [];
-
-    const successfulResults = [...subnationalResults, ...locResults].flatMap(
-      (result) =>
-        result.status === 'fulfilled'
-          ? Array.isArray(result.value)
-            ? result.value
-            : []
+    const successfulResults = subnationalResults.flatMap((result) =>
+      result.status === 'fulfilled'
+        ? Array.isArray(result.value)
+          ? result.value
           : []
+        : []
     );
 
     return res.status(200).json(successfulResults);
