@@ -216,18 +216,25 @@ export const useBirdHistoric = ({
   ]);
 
   const allHistoricBirds = useMemo(
-    () =>
-      Array.from(
+    () => {
+      if (!selectedDates.length) {
+        return [] as HistoricBird[];
+      }
+
+      const selectedBirds = selectedDates.flatMap(
+        (date) => historicBirdsByDate[date] ?? []
+      );
+
+      return Array.from(
         new Map(
-          Object.values(historicBirdsByDate)
-            .flat()
-            .map((bird) => {
-              const speciesKey = bird.speciesCode || bird.name.toLowerCase();
-              return [speciesKey, bird] as const;
-            })
+          selectedBirds.map((bird) => {
+            const speciesKey = bird.speciesCode || bird.name.toLowerCase();
+            return [speciesKey, bird] as const;
+          })
         ).values()
-      ),
-    [historicBirdsByDate]
+      );
+    },
+    [historicBirdsByDate, selectedDates]
   );
 
   const historicSpeciesLookup = useMemo(() => {
