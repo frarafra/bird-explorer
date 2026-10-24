@@ -32,43 +32,14 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     const [sortMethod, setSortMethod] = useState<
         'name' | 'similarity' | 'abundance'
     >('name');
-    const [selectedDates, setSelectedDates] = useState<string[]>([]);
     const [dateInputValue, setDateInputValue] = useState('');
     const dateInputRef = useRef<HTMLInputElement | null>(null);
-
-    const addDate = (nextDate: string) => {
-        if (!nextDate) {
-            setDateInputValue('');
-            return;
-        }
-
-        setSelectedDates((prevDates) => {
-            if (prevDates.includes(nextDate)) {
-                return prevDates;
-            }
-
-            const nextDates = [...prevDates, nextDate].sort();
-            setPage(0);
-            return nextDates;
-        });
-        setDateInputValue('');
-    };
-
-    const removeDate = (dateToRemove: string) => {
-        setSelectedDates((prevDates) => {
-            const nextDates = prevDates.filter((date) => date !== dateToRemove);
-            setPage(0);
-            return nextDates;
-        });
-    };
 
     const batchSize = Number(process.env.NEXT_PUBLIC_BATCH_SIZE);
     const lat = Number(process.env.NEXT_PUBLIC_LAT ?? 0);
     const lng = Number(process.env.NEXT_PUBLIC_LNG ?? 0);
 
     const router = useRouter();
-    const normalizeHistoricBirdName = (value: string = '') => value.trim().toLowerCase();
-
     const {
         groups,
         orderedBirds,
@@ -160,115 +131,28 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     };
 
     const {
-        allHistoricBirds,
-        historicSpeciesLookup,
-        effectiveTaxonomies,
+        selectedDates,
+        addDate,
+        removeDate,
+        historicBirdsFlat,
+        paginatedHistoricBirdsToDisplay,
+        historicBirdsForImages,
         showNoObservationsMessage,
     } = useBirdHistoric({
-        selectedDates,
         hotspotSubnationalCodes,
         mapBounds,
+        groups,
+        selectedGroup,
         birds,
+        birdImages,
         speciesObserved,
         taxonomies,
         contextTaxonomies,
         setTaxonomies,
+        setPage,
+        page,
+        batchSize,
     });
-
-    const historicBirdCards = allHistoricBirds
-        .map((bird) => {
-            const normalizedHistoricName = normalizeHistoricBirdName(bird.name);
-            const speciesCodeFromLookup = historicSpeciesLookup.get(normalizedHistoricName);
-            const matchedBird = bird.speciesCode
-                ? Object.entries(birds).find(([, speciesCode]) => speciesCode === bird.speciesCode)
-                : undefined;
-
-            const matchedBirdByCommonName = !matchedBird
-                ? Object.entries(birds).find(([name]) => normalizeHistoricBirdName(name) === normalizedHistoricName)
-                : undefined;
-
-            const matchedBirdByScientificName = !matchedBird && !matchedBirdByCommonName
-                ? speciesObserved.find((obs: any) => normalizeHistoricBirdName(obs?.sciName || '') === normalizedHistoricName)
-                : undefined;
-
-            const finalSpeciesCode = matchedBird?.[1]
-                || matchedBirdByCommonName?.[1]
-                || matchedBirdByScientificName?.speciesCode
-                || bird.speciesCode
-                || speciesCodeFromLookup
-                || '';
-
-            const finalName = matchedBird?.[0]
-                || matchedBirdByCommonName?.[0]
-                || matchedBirdByScientificName?.comName
-                || speciesObserved.find((obs: any) => obs?.speciesCode === finalSpeciesCode)?.comName
-                || bird.name
-                || '';
-
-            const normalizedName = normalizeHistoricBirdName(finalName);
-            const birdImage = Object.entries(birdImages).find(([name]) => normalizeHistoricBirdName(name) === normalizedName)?.[1]
-                ?? Object.entries(birdImages).find(([name]) => normalizeHistoricBirdName(name) === normalizedHistoricName)?.[1];
-            const group = finalSpeciesCode ? effectiveTaxonomies[finalSpeciesCode] ?? 'Unknown' : 'Unknown';
-
-            return {
-                name: normalizedName,
-                speciesCode: finalSpeciesCode,
-                image: birdImage,
-                group,
-            };
-        })
-        .filter((bird) => bird.name || bird.speciesCode);
-
-    const historicBirdGroups = (
-        selectedGroup === 'All Groups'
-            ? Array.from(
-                new Set([
-                    ...groups.filter((group) => group !== 'All Groups'),
-                    ...historicBirdCards.map((bird) => bird.group),
-                ])
-            ).sort((a, b) => a.localeCompare(b))
-            : [selectedGroup]
-    ).reduce<Record<string, typeof historicBirdCards>>((acc, groupName) => {
-        acc[groupName] = historicBirdCards.filter(
-            (bird) => bird.group === groupName
-        );
-
-        return acc;
-    }, {});
-
-    const historicBirdsToDisplay: Array<[string, [string, string][]]> = Object.entries(historicBirdGroups)
-        .filter(([, groupBirds]) => groupBirds.length > 0)
-        .map(([groupName, groupBirds]) => [
-            groupName,
-            groupBirds.map((bird) => [bird.name, bird.speciesCode] as [string, string])
-        ]);
-
-    const historicBirdsFlat = historicBirdsToDisplay.flatMap(([groupName, groupBirds]) =>
-        groupBirds.map(([name, speciesCode]) => [groupName, name, speciesCode] as const)
-    );
-
-    const historicVisibleBirds = historicBirdsFlat.slice(0, (page + 1) * batchSize);
-
-    const paginatedHistoricBirdsToDisplay = Object.entries(
-        historicVisibleBirds.reduce<Record<string, [string, string][]>>((acc, [groupName, name, speciesCode]) => {
-            if (!acc[groupName]) {
-                acc[groupName] = [];
-            }
-
-            acc[groupName].push([name, speciesCode]);
-            return acc;
-        }, {})
-    );
-
-    const historicBirdsForImages = React.useMemo(() => {
-        const uniqueBirds = new Map<string, [string, string]>();
-
-        historicVisibleBirds.forEach(([, name, speciesCode]) => {
-            uniqueBirds.set(`${name}:${speciesCode}`, [name, speciesCode]);
-        });
-
-        return Array.from(uniqueBirds.values());
-    }, [historicVisibleBirds]);
 
     const imageBirds = selectedDates.length > 0 ? historicBirdsForImages : birdsByGroup;
 
@@ -348,8 +232,8 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                     return;
                                 }
 
-                                setDateInputValue(nextDate);
                                 addDate(nextDate);
+                                setDateInputValue('');
                             }}
                             onBlur={() => setDateInputValue('')}
                             className="sr-only"

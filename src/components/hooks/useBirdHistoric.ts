@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+const normalizeHistoricBirdName = (value: string = '') => value.trim().toLowerCase();
+
 export type HistoricBird = {
   name: string;
   speciesCode: string;
 };
 
+export type HistoricBirdCard = {
+  name: string;
+  speciesCode: string;
+  image: string | undefined;
+  group: string;
+};
+
 type UseBirdHistoricProps = {
-  selectedDates: string[];
   hotspotSubnationalCodes: string[];
   mapBounds: {
     north: number;
@@ -14,23 +22,35 @@ type UseBirdHistoricProps = {
     east: number;
     west: number;
   };
+  groups: string[];
+  selectedGroup: string;
   birds: Record<string, string>;
+  birdImages: Record<string, string>;
   speciesObserved: any[];
   taxonomies: Record<string, string>;
   contextTaxonomies: Record<string, string>;
   setTaxonomies: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setPage: React.Dispatch<React.SetStateAction<number>>;
+  page: number;
+  batchSize: number;
 };
 
 export const useBirdHistoric = ({
-  selectedDates,
   hotspotSubnationalCodes,
   mapBounds,
+  groups,
+  selectedGroup,
   birds,
+  birdImages,
   speciesObserved,
   taxonomies,
   contextTaxonomies,
   setTaxonomies,
+  setPage,
+  page,
+  batchSize,
 }: UseBirdHistoricProps) => {
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [historicBirdsByDate, setHistoricBirdsByDate] = useState<
     Record<string, HistoricBird[]>
   >({});
@@ -40,6 +60,32 @@ export const useBirdHistoric = ({
   const requestedDatesRef = useRef(new Set<string>());
   const taxonomyRequestRef = useRef(new Set<string>());
   const handledEmptyDatesRef = useRef(new Set<string>());
+
+  const addDate = useCallback(
+    (nextDate: string) => {
+      if (!nextDate || selectedDates.includes(nextDate)) {
+        return;
+      }
+
+      setSelectedDates((prevDates) =>
+        prevDates.includes(nextDate)
+          ? prevDates
+          : [...prevDates, nextDate].sort()
+      );
+      setPage(0);
+    },
+    [selectedDates, setPage]
+  );
+
+  const removeDate = useCallback(
+    (dateToRemove: string) => {
+      setSelectedDates((prevDates) =>
+        prevDates.filter((date) => date !== dateToRemove)
+      );
+      setPage(0);
+    },
+    [setPage]
+  );
 
   useEffect(() => {
     if (!showNoObservationsMessage) {
@@ -279,6 +325,157 @@ export const useBirdHistoric = ({
     return map;
   }, [birds, speciesObserved]);
 
+  const effectiveTaxonomies = useMemo(
+    () => ({ ...taxonomies, ...contextTaxonomies }),
+    [taxonomies, contextTaxonomies]
+  );
+
+  const historicBirdCards = useMemo(
+    () =>
+      allHistoricBirds
+        .map((bird) => {
+          const normalizedHistoricName = normalizeHistoricBirdName(bird.name);
+          const speciesCodeFromLookup = historicSpeciesLookup.get(normalizedHistoricName);
+          const matchedBird = bird.speciesCode
+            ? Object.entries(birds).find(([, speciesCode]) => speciesCode === bird.speciesCode)
+            : undefined;
+
+          const matchedBirdByCommonName = !matchedBird
+            ? Object.entries(birds).find(
+                ([name]) => normalizeHistoricBirdName(name) === normalizedHistoricName
+              )
+            : undefined;
+
+          const matchedBirdByScientificName = !matchedBird && !matchedBirdByCommonName
+            ? speciesObserved.find(
+                (obs: any) =>
+                  normalizeHistoricBirdName(obs?.sciName || '') === normalizedHistoricName
+              )
+            : undefined;
+
+          const finalSpeciesCode =
+            matchedBird?.[1] ||
+            matchedBirdByCommonName?.[1] ||
+            matchedBirdByScientificName?.speciesCode ||
+            bird.speciesCode ||
+            speciesCodeFromLookup ||
+            '';
+
+          const finalName =
+            matchedBird?.[0] ||
+            matchedBirdByCommonName?.[0] ||
+            matchedBirdByScientificName?.comName ||
+            speciesObserved.find((obs: any) => obs?.speciesCode === finalSpeciesCode)?.comName ||
+            bird.name ||
+            '';
+
+          const normalizedName = normalizeHistoricBirdName(finalName);
+          const birdImage =
+            Object.entries(birdImages).find(
+              ([name]) => normalizeHistoricBirdName(name) === normalizedName
+            )?.[1] ??
+            Object.entries(birdImages).find(
+              ([name]) => normalizeHistoricBirdName(name) === normalizedHistoricName
+            )?.[1];
+          const group = finalSpeciesCode
+            ? effectiveTaxonomies[finalSpeciesCode] ?? 'Unknown'
+            : 'Unknown';
+
+          return {
+            name: normalizedName,
+            speciesCode: finalSpeciesCode,
+            image: birdImage,
+            group,
+          };
+        })
+        .filter((bird) => bird.name || bird.speciesCode),
+    [
+      allHistoricBirds,
+      birdImages,
+      birds,
+      effectiveTaxonomies,
+      historicSpeciesLookup,
+      speciesObserved,
+    ]
+  );
+
+  const historicBirdGroups = useMemo(() => {
+    const groupNames =
+      selectedGroup === 'All Groups'
+        ? Array.from(
+            new Set([
+              ...groups.filter((group) => group !== 'All Groups'),
+              ...historicBirdCards.map((bird) => bird.group),
+            ])
+          ).sort((a, b) => a.localeCompare(b))
+        : [selectedGroup];
+
+    return groupNames.reduce<Record<string, HistoricBirdCard[]>>(
+      (acc, groupName) => {
+        acc[groupName] = historicBirdCards.filter(
+          (bird) => bird.group === groupName
+        );
+
+        return acc;
+      },
+      {}
+    );
+  }, [groups, historicBirdCards, selectedGroup]);
+
+  const historicBirdsToDisplay = useMemo(
+    () =>
+      Object.entries(historicBirdGroups)
+        .filter(([, groupBirds]) => groupBirds.length > 0)
+        .map(([groupName, groupBirds]) => [
+          groupName,
+          groupBirds.map((bird) => [bird.name, bird.speciesCode] as [string, string]),
+        ] as [string, [string, string][]]),
+    [historicBirdGroups]
+  );
+
+  const historicBirdsFlat = useMemo(
+    () =>
+      historicBirdsToDisplay.flatMap(([groupName, groupBirds]) =>
+        groupBirds.map(
+          ([name, speciesCode]) => [groupName, name, speciesCode] as const
+        )
+      ),
+    [historicBirdsToDisplay]
+  );
+
+  const historicVisibleBirds = useMemo(
+    () => historicBirdsFlat.slice(0, (page + 1) * batchSize),
+    [batchSize, historicBirdsFlat, page]
+  );
+
+  const paginatedHistoricBirdsToDisplay = useMemo(
+    () =>
+      Object.entries(
+        historicVisibleBirds.reduce<Record<string, [string, string][]>>(
+          (acc, [groupName, name, speciesCode]) => {
+            if (!acc[groupName]) {
+              acc[groupName] = [];
+            }
+
+            acc[groupName].push([name, speciesCode]);
+            return acc;
+          },
+          {}
+        )
+      ),
+    [historicVisibleBirds]
+  );
+
+  const historicBirdsForImages = useMemo(() => {
+    const uniqueBirds = new Map<string, [string, string]>();
+
+    historicVisibleBirds.forEach(([, name, speciesCode]) => {
+      uniqueBirds.set(`${name}:${speciesCode}`, [name, speciesCode]);
+    });
+
+    return Array.from(uniqueBirds.values());
+  }, [historicVisibleBirds]);
+
   useEffect(() => {
     const missingSpeciesCodes = Array.from(
       new Set(
@@ -298,10 +495,20 @@ export const useBirdHistoric = ({
   }, [allHistoricBirds, birds, contextTaxonomies, fetchMissingTaxonomies]);
 
   return {
+    selectedDates,
+    addDate,
+    removeDate,
     historicBirdsByDate,
     allHistoricBirds,
     historicSpeciesLookup,
+    historicBirdCards,
+    historicBirdGroups,
+    historicBirdsToDisplay,
+    historicBirdsFlat,
+    historicVisibleBirds,
+    paginatedHistoricBirdsToDisplay,
+    historicBirdsForImages,
     showNoObservationsMessage,
-    effectiveTaxonomies: { ...taxonomies, ...contextTaxonomies },
+    effectiveTaxonomies,
   };
 };
