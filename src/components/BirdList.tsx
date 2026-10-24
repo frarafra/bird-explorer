@@ -36,31 +36,8 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     const [dateInputValue, setDateInputValue] = useState('');
     const dateInputRef = useRef<HTMLInputElement | null>(null);
 
-    const isBrowserDefaultMonthNavigationDate = (value: string) => {
-        if (!value) return false;
-
-        const date = new Date(value);
-        const now = new Date();
-
-        if (Number.isNaN(date.getTime())) {
-            return false;
-        }
-
-        const isSameDayOfMonth = date.getDate() === now.getDate();
-        const isSameMonthAndYear =
-            date.getMonth() === now.getMonth() &&
-            date.getFullYear() === now.getFullYear();
-
-        return isSameDayOfMonth && !isSameMonthAndYear;
-    };
-
     const addDate = (nextDate: string) => {
         if (!nextDate) {
-            setDateInputValue('');
-            return;
-        }
-
-        if (isBrowserDefaultMonthNavigationDate(nextDate)) {
             setDateInputValue('');
             return;
         }
@@ -183,10 +160,10 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
     };
 
     const {
-        historicBirdsByDate,
         allHistoricBirds,
         historicSpeciesLookup,
         effectiveTaxonomies,
+        showNoObservationsMessage,
     } = useBirdHistoric({
         selectedDates,
         hotspotSubnationalCodes,
@@ -371,11 +348,6 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                     return;
                                 }
 
-                                if (isBrowserDefaultMonthNavigationDate(nextDate)) {
-                                    setDateInputValue('');
-                                    return;
-                                }
-
                                 setDateInputValue(nextDate);
                                 addDate(nextDate);
                             }}
@@ -406,6 +378,12 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                         </span>
                     ))}
                 </div>
+            )}
+
+            {showNoObservationsMessage && (
+                <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+                    no observations for the selected date
+                </p>
             )}
 
             {selectedDates.length > 0 ? (

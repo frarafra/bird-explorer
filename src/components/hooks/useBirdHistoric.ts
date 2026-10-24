@@ -34,9 +34,24 @@ export const useBirdHistoric = ({
   const [historicBirdsByDate, setHistoricBirdsByDate] = useState<
     Record<string, HistoricBird[]>
   >({});
+  const [showNoObservationsMessage, setShowNoObservationsMessage] = useState(false);
+  const [emptyNoticeVersion, setEmptyNoticeVersion] = useState(0);
 
   const requestedDatesRef = useRef(new Set<string>());
   const taxonomyRequestRef = useRef(new Set<string>());
+  const handledEmptyDatesRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!showNoObservationsMessage) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setShowNoObservationsMessage(false);
+    }, 3000);
+
+    return () => clearTimeout(timeout);
+  }, [emptyNoticeVersion, showNoObservationsMessage]);
 
   const fetchMissingTaxonomies = useCallback(
     async (speciesCodes: string[]) => {
@@ -162,7 +177,25 @@ export const useBirdHistoric = ({
               }
             });
 
-            return [date, Array.from(dedupedBirds.values())] as const;
+            const birdsForSelectedDate = Array.from(dedupedBirds.values());
+
+            if (!cancelled) {
+              setHistoricBirdsByDate((previous) => ({
+                ...previous,
+                [date]: birdsForSelectedDate,
+              }));
+
+              if (
+                birdsForSelectedDate.length === 0 &&
+                !handledEmptyDatesRef.current.has(date)
+              ) {
+                handledEmptyDatesRef.current.add(date);
+                setShowNoObservationsMessage(true);
+                setEmptyNoticeVersion((version) => version + 1);
+              }
+            }
+
+            return date;
           })
         );
 
@@ -170,26 +203,11 @@ export const useBirdHistoric = ({
           return;
         }
 
-        const successfulResults = results.filter(
-          (
-            result
-          ): result is PromiseFulfilledResult<
-            readonly [string, HistoricBird[]]
-          > => result.status === 'fulfilled'
-        );
-
         results.forEach((result, index) => {
           if (result.status === 'rejected') {
             requestedDatesRef.current.delete(datesToFetch[index]);
           }
         });
-
-        if (successfulResults.length > 0) {
-          setHistoricBirdsByDate((previous) => ({
-            ...previous,
-            ...Object.fromEntries(successfulResults.map((result) => result.value)),
-          }));
-        }
       } catch (error) {
         console.error('Failed to load historical birds:', error);
       } finally {
@@ -283,6 +301,7 @@ export const useBirdHistoric = ({
     historicBirdsByDate,
     allHistoricBirds,
     historicSpeciesLookup,
+    showNoObservationsMessage,
     effectiveTaxonomies: { ...taxonomies, ...contextTaxonomies },
   };
 };
