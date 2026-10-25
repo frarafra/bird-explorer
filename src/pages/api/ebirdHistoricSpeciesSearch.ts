@@ -1,6 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import pLimit from 'p-limit';
 
 const EBIRD_HISTORIC_API_URL = 'https://api.ebird.org/v2/data/obs';
+const MAX_CONCURRENT_EBIRD_REQUESTS = 2;
+const limitEbirdRequests = pLimit(MAX_CONCURRENT_EBIRD_REQUESTS);
 
 type HistoricBounds = {
   north?: number;
@@ -94,29 +97,31 @@ async function fetchHistoricSpecies({
     throw new Error('Missing subnationalCode or locId');
   }
 
-  const normalizedDate = date.replace(/-/g, '/');
-  const endpoint = locId
-    ? `${EBIRD_HISTORIC_API_URL}/${locId}/historic/${normalizedDate}`
-    : `${EBIRD_HISTORIC_API_URL}/${subnationalCode}/historic/${normalizedDate}`;
+  return limitEbirdRequests(async () => {
+    const normalizedDate = date.replace(/-/g, '/');
+    const endpoint = locId
+      ? `${EBIRD_HISTORIC_API_URL}/${locId}/historic/${normalizedDate}`
+      : `${EBIRD_HISTORIC_API_URL}/${subnationalCode}/historic/${normalizedDate}`;
 
-  const response = await fetch(endpoint, {
-    headers: {
-      'X-eBirdApiToken': process.env.NEXT_PUBLIC_EBIRD_API_TOKEN || '',
-    },
+    const response = await fetch(endpoint, {
+      headers: {
+        'X-eBirdApiToken': process.env.NEXT_PUBLIC_EBIRD_API_TOKEN || '',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch historic data from eBird API');
+    }
+
+    const data = await response.json();
+    const observations = Array.isArray(data) ? data : [];
+
+    if (!subnationalCode) {
+      return observations;
+    }
+
+    return filterObservationsByBounds(observations, north, south, east, west);
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch historic data from eBird API');
-  }
-
-  const data = await response.json();
-  const observations = Array.isArray(data) ? data : [];
-
-  if (!subnationalCode) {
-    return observations;
-  }
-
-  return filterObservationsByBounds(observations, north, south, east, west);
 }
 
 const getSubnationalCodes = (req: NextApiRequest) => {

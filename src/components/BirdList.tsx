@@ -28,7 +28,6 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         taxonomies: contextTaxonomies,
     } = useContext(BirdContext);
 
-
     const [sortMethod, setSortMethod] = useState<
         'name' | 'similarity' | 'abundance'
     >('name');
