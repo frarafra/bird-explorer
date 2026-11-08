@@ -1,4 +1,4 @@
-import React, { FC, useContext, useState, useEffect, useRef } from 'react';
+import React, { FC, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { BirdContext } from '../contexts/BirdContext';
 import { useBirdAbundance } from './hooks/useBirdAbundance';
@@ -33,7 +33,6 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         'name' | 'similarity' | 'abundance'
     >('name');
     const [dateInputValue, setDateInputValue] = useState('');
-    const dateInputRef = useRef<HTMLInputElement | null>(null);
 
     const batchSize = Number(process.env.NEXT_PUBLIC_BATCH_SIZE);
     const lat = Number(process.env.NEXT_PUBLIC_LAT ?? 0);
@@ -193,21 +192,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
 
                 {hotspotSubnationalCodes.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setDateInputValue('');
-                                if (dateInputRef.current) {
-                                    if (typeof dateInputRef.current.showPicker === 'function') {
-                                        dateInputRef.current.showPicker();
-                                    } else {
-                                        dateInputRef.current.click();
-                                    }
-                                }
-                            }}
-                            className="flex cursor-pointer items-center justify-center rounded border border-slate-300 bg-white p-2 text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            aria-label="Select a date"
-                        >
+                        <label className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded border border-slate-300 bg-white text-slate-700 transition hover:border-slate-400 focus-within:ring-2 focus-within:ring-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                             <svg
                                 viewBox="0 0 24 24"
                                 fill="none"
@@ -221,25 +206,24 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                                 <rect x="3" y="5" width="18" height="16" rx="2" />
                                 <path d="M8 3v4M16 3v4M3 10h18" />
                             </svg>
-                        </button>
-                        <input
-                            ref={dateInputRef}
-                            type="date"
-                            value={dateInputValue}
-                            onChange={(e) => {
-                                const nextDate = e.target.value;
-                                if (!nextDate) {
-                                    setDateInputValue('');
-                                    return;
-                                }
+                            <input
+                                type="date"
+                                value={dateInputValue}
+                                onChange={(e) => {
+                                    const nextDate = e.target.value;
+                                    if (!nextDate) {
+                                        setDateInputValue('');
+                                        return;
+                                    }
 
-                                addDate(nextDate);
-                                setDateInputValue('');
-                            }}
-                            onBlur={() => setDateInputValue('')}
-                            className="sr-only"
-                            aria-label="Date picker"
-                        />
+                                    addDate(nextDate);
+                                    setDateInputValue('');
+                                }}
+                                onBlur={() => setDateInputValue('')}
+                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                aria-label="Select a date"
+                            />
+                        </label>
                     </div>
                 )}
             </div>
