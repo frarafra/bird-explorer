@@ -25,7 +25,13 @@ const HistoricDatePicker = ({
     const [isOpen, setIsOpen] = useState(false);
     const [isYearGridOpen, setIsYearGridOpen] = useState(false);
     const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+    const [popupPosition, setPopupPosition] = useState<{
+        left: number;
+        top: number;
+    } | null>(null);
     const datePickerRef = useRef<HTMLDivElement | null>(null);
+    const triggerRef = useRef<HTMLButtonElement | null>(null);
+    const popupRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         if (!isOpen) {
@@ -59,6 +65,48 @@ const HistoricDatePicker = ({
         };
     }, [isOpen]);
 
+    useEffect(() => {
+        if (!isOpen) {
+            setPopupPosition(null);
+            return;
+        }
+
+        const updatePopupPosition = () => {
+            const trigger = triggerRef.current?.getBoundingClientRect();
+            const popup = popupRef.current?.getBoundingClientRect();
+
+            if (!trigger || !popup) {
+                return;
+            }
+
+            const margin = 8;
+            const left = Math.max(
+                margin,
+                Math.min(
+                    trigger.left,
+                    window.innerWidth - popup.width - margin
+                )
+            );
+            const belowTop = trigger.bottom + margin;
+            const top =
+                belowTop + popup.height <= window.innerHeight - margin
+                    ? belowTop
+                    : Math.max(margin, trigger.top - popup.height - margin);
+
+            setPopupPosition({ left, top });
+        };
+
+        const animationFrame = window.requestAnimationFrame(updatePopupPosition);
+        window.addEventListener('resize', updatePopupPosition);
+        window.addEventListener('scroll', updatePopupPosition, true);
+
+        return () => {
+            window.cancelAnimationFrame(animationFrame);
+            window.removeEventListener('resize', updatePopupPosition);
+            window.removeEventListener('scroll', updatePopupPosition, true);
+        };
+    }, [isOpen, isYearGridOpen, calendarMonth]);
+
     const calendarDecade = Math.floor(calendarMonth.getFullYear() / 10) * 10;
 
     return (
@@ -67,9 +115,11 @@ const HistoricDatePicker = ({
             className="relative flex flex-wrap items-center gap-2"
         >
             <button
+                ref={triggerRef}
                 type="button"
                 onClick={() => {
                     setIsYearGridOpen(false);
+                    setPopupPosition(null);
                     setIsOpen((open) => !open);
                 }}
                 className="flex h-9 w-9 cursor-pointer items-center justify-center rounded border border-slate-300 bg-white text-slate-700 transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -93,7 +143,13 @@ const HistoricDatePicker = ({
             </button>
             {isOpen && (
                 <div
-                    className="absolute left-0 top-full z-50 mt-2 rounded-lg border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+                    ref={popupRef}
+                    className="fixed z-50 max-h-[calc(100dvh-1rem)] max-w-[calc(100vw-1rem)] overflow-auto rounded-lg border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+                    style={{
+                        left: popupPosition?.left ?? 0,
+                        top: popupPosition?.top ?? 0,
+                        visibility: popupPosition ? 'visible' : 'hidden',
+                    }}
                     role="dialog"
                     aria-label="Choose historic observation date"
                 >
