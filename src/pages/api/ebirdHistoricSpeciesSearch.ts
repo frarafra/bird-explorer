@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+
 import { getRedisClient } from '../../client/redis';
 
 const EBIRD_HISTORIC_API_URL = 'https://api.ebird.org/v2/data/obs';
@@ -11,67 +12,104 @@ type HistoricBounds = {
   west?: number;
 };
 
-const parseQueryValues = (value: string | string[] | undefined) => {
-  const values = Array.isArray(value) ? value : value ? [value] : [];
-
-  return values
-    .flatMap((item) => item.split(',').map((entry) => entry.trim()))
-    .filter((item) => item.length > 0);
+type HistoricObservation = {
+  locId?: unknown;
+  [key: string]: unknown;
 };
 
-const parseBounds = (req: NextApiRequest): HistoricBounds => {
-  const north = Array.isArray(req.query.north)
-    ? Number(req.query.north[0])
-    : Number(req.query.north);
-  const south = Array.isArray(req.query.south)
-    ? Number(req.query.south[0])
-    : Number(req.query.south);
-  const east = Array.isArray(req.query.east)
-    ? Number(req.query.east[0])
-    : Number(req.query.east);
-  const west = Array.isArray(req.query.west)
-    ? Number(req.query.west[0])
-    : Number(req.query.west);
+type StreamMessage =
+  | { type: 'observations'; observations: HistoricObservation[] }
+  | { type: 'error'; message: string }
+  | { type: 'progress'; message: string };
 
-  return {
-    north: Number.isFinite(north) ? north : undefined,
-    south: Number.isFinite(south) ? south : undefined,
-    east: Number.isFinite(east) ? east : undefined,
-    west: Number.isFinite(west) ? west : undefined,
-  };
+class EbirdApiError extends Error {
+  constructor(
+    readonly status: number,
+    statusText: string
+  ) {
+    super(`eBird historic API returned ${status} ${statusText}`);
+  }
+}
+
+const isLocationId = (value: unknown): value is { locId: string } =>
+  Boolean(
+    value &&
+      typeof value === 'object' &&
+      'locId' in value &&
+      typeof value.locId === 'string'
+  );
+
+const getQueryValues = (value: string | string[] | undefined) =>
+  value === undefined ? [] : Array.isArray(value) ? value : [value];
+
+const parseQueryValues = (values: string[]) =>
+  Array.from(
+    new Set(
+      values
+        .flatMap((value) => value.split(','))
+        .map((value) => value.trim())
+        .filter(Boolean)
+    )
+  );
+
+const parseBound = (value: string | undefined) => {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 };
+
+const parseBounds = (query: NextApiRequest['query']): HistoricBounds => ({
+  north: parseBound(Array.isArray(query.north) ? query.north[0] : query.north),
+  south: parseBound(Array.isArray(query.south) ? query.south[0] : query.south),
+  east: parseBound(Array.isArray(query.east) ? query.east[0] : query.east),
+  west: parseBound(Array.isArray(query.west) ? query.west[0] : query.west),
+});
+
+const hasCompleteBounds = ({
+  north,
+  south,
+  east,
+  west,
+}: HistoricBounds) =>
+  [north, south, east, west].every((value) => value !== undefined);
 
 const filterObservationsByBounds = (
-  observations: any[],
-  north?: number,
-  south?: number,
-  east?: number,
-  west?: number
+  observations: HistoricObservation[],
+  { north, south, east, west }: HistoricBounds
 ) => {
-  const bounds = [north, south, east, west].map((value) => Number(value));
-  const hasBounds = bounds.every((value) => Number.isFinite(value));
-
-  if (!hasBounds) {
+  if (!hasCompleteBounds({ north, south, east, west })) {
     return observations;
   }
 
   const minLat = Math.min(north!, south!);
   const maxLat = Math.max(north!, south!);
-  const minLng = Math.min(west!, east!);
-  const maxLng = Math.max(west!, east!);
 
-  return observations.filter((observation: any) => {
-    const lat = Number(observation?.lat);
-    const lng = Number(observation?.lng);
+  return observations.filter((observation) => {
+    const lat = Number(observation.lat);
+    const lng = Number(observation.lng);
+    const longitudeInBounds =
+      west! <= east!
+        ? lng >= west! && lng <= east!
+        : lng >= west! || lng <= east!;
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return false;
-    }
+    return (
+      Number.isFinite(lat) &&
+      lat >= minLat &&
+      lat <= maxLat &&
+      Number.isFinite(lng) &&
+      longitudeInBounds
+    );
+  });
+};
 
-    const latInBounds = lat >= minLat && lat <= maxLat;
-    const lngInBounds = lng >= minLng && lng <= maxLng;
-
-    return latInBounds && lngInBounds;
+const fetchEbirdResponse = async (endpoint: string, signal?: AbortSignal) => {
+  return fetch(endpoint, {
+    headers: {
+      'X-eBirdApiToken': process.env.NEXT_PUBLIC_EBIRD_API_TOKEN || '',
+    },
+    signal,
   });
 };
 
@@ -79,18 +117,18 @@ async function fetchHistoricSpecies({
   subnationalCode,
   locId,
   date,
-  north,
-  south,
-  east,
-  west,
+  bounds,
+  onBoundedObservations,
+  signal,
 }: {
   subnationalCode?: string;
   locId?: string;
   date: string;
-  north?: number;
-  south?: number;
-  east?: number;
-  west?: number;
+  bounds?: HistoricBounds;
+  onBoundedObservations?: (
+    observations: HistoricObservation[]
+  ) => Promise<void>;
+  signal?: AbortSignal;
 }) {
   if (!subnationalCode && !locId) {
     throw new Error('Missing subnationalCode or locId');
@@ -105,172 +143,237 @@ async function fetchHistoricSpecies({
   const cacheKey = subnationalCode
     ? `ebirdHistoricSubnationalLocIds:${encodeURIComponent(subnationalCode)}:${normalizedDate}`
     : null;
-  const cachedData = cacheKey && redis ? await redis.get(cacheKey) : null;
+  const cachedData =
+    cacheKey && redis && !bounds ? await redis.get(cacheKey) : null;
 
   if (cachedData) {
-    const observations: unknown = JSON.parse(cachedData);
-    if (!Array.isArray(observations)) {
+    const cachedLocationIds: unknown = JSON.parse(cachedData);
+    if (
+      !Array.isArray(cachedLocationIds) ||
+      !cachedLocationIds.every(isLocationId)
+    ) {
       throw new Error(
         `Invalid cached historic location IDs for ${subnationalCode}`
       );
     }
 
+    return cachedLocationIds.map(({ locId }) => ({ locId }));
+  }
+
+  const response = await fetchEbirdResponse(endpoint, signal);
+
+  if (!response.ok) {
+    throw new EbirdApiError(
+      response.status,
+      response.statusText
+    );
+  }
+
+  const data: unknown = await response.json();
+  const observations: HistoricObservation[] = Array.isArray(data) ? data : [];
+
+  if (!subnationalCode) {
     return observations;
   }
 
-  const response = await fetch(endpoint, {
-    headers: {
-      'X-eBirdApiToken': process.env.NEXT_PUBLIC_EBIRD_API_TOKEN || '',
-    },
-  });
+  const observationsInBounds = bounds
+    ? filterObservationsByBounds(observations, bounds)
+    : observations;
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch historic data from eBird API');
+  if (observationsInBounds.length && onBoundedObservations) {
+    await onBoundedObservations(observationsInBounds);
   }
 
-  const data = await response.json();
-  const observations = Array.isArray(data) ? data : [];
+  const locationIds = getLocIds(observations).map((locId) => ({ locId }));
 
-  if (subnationalCode) {
-    const locationIds = Array.from(
-      new Set(
-        observations
-          .map((observation: any) => observation?.locId)
-          .filter(
-            (locId: unknown): locId is string =>
-              typeof locId === 'string' && locId.trim().length > 0
-          )
-      )
-    ).map((locId) => ({ locId }));
-
-    if (cacheKey && redis) {
-      await redis.set(
-        cacheKey,
-        JSON.stringify(locationIds),
-        'EX',
-        HISTORIC_SUBNATIONAL_CACHE_TTL_SECONDS
-      );
-    }
-
-    return locationIds;
+  if (cacheKey && redis) {
+    await redis.set(
+      cacheKey,
+      JSON.stringify(locationIds),
+      'EX',
+      HISTORIC_SUBNATIONAL_CACHE_TTL_SECONDS
+    );
   }
 
-  return observations;
+  return getLocIds(observationsInBounds).map((locId) => ({ locId }));
 }
 
-const getSubnationalCodes = (req: NextApiRequest) => {
-  const values = parseQueryValues(req.query.subnationalCodes)
-    .concat(parseQueryValues(req.query.subnationalCode));
-
-  return Array.from(new Set(values));
-};
-
-const getLocIdsFromHistoricResults = (results: PromiseSettledResult<any[] | any>[]) => {
-  return Array.from(
+const getLocIds = (observations: HistoricObservation[]) =>
+  Array.from(
     new Set(
-      results.flatMap((result) => {
-        if (result.status !== 'fulfilled') {
-          return [];
-        }
-
-        const observations = Array.isArray(result.value) ? result.value : [];
-
-        return observations
-          .map((observation: any) => observation?.locId)
-          .filter(
-            (locId): locId is string =>
-              typeof locId === 'string' && locId.trim().length > 0
-          );
-      })
+      observations
+        .map((observation) => observation?.locId)
+        .filter(
+          (locId): locId is string =>
+            typeof locId === 'string' && locId.trim().length > 0
+        )
     )
   );
-};
+
+const errorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : 'Unknown historic fetch error';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const subnationalCodes = getSubnationalCodes(req);
-  const rawDate = Array.isArray(req.query.date)
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', 'GET');
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  const subnationalCodes = parseQueryValues([
+    ...getQueryValues(req.query.subnationalCodes),
+    ...getQueryValues(req.query.subnationalCode),
+  ]);
+  const date = Array.isArray(req.query.date)
     ? req.query.date[0]
     : req.query.date;
-  const bounds = parseBounds(req);
 
   if (!subnationalCodes.length) {
     return res
       .status(400)
       .json({ error: 'Missing subnationalCode or subnationalCodes parameter' });
   }
-
-  if (!rawDate) {
+  if (!date) {
     return res.status(400).json({ error: 'Missing date parameter' });
   }
 
+  const bounds = parseBounds(req.query);
+  if (!hasCompleteBounds(bounds)) {
+    return res.status(400).json({ error: 'Missing or invalid map bounds' });
+  }
+
+  const abortController = new AbortController();
+  let cancelled = false;
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      cancelled = true;
+      abortController.abort();
+    }
+  });
+
+  res.status(200);
+  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  const send = async (message: StreamMessage) => {
+    if (cancelled || res.writableEnded) {
+      return;
+    }
+
+    if (!res.write(`${JSON.stringify(message)}\n`)) {
+      await new Promise<void>((resolve) => {
+        const onDrain = () => {
+          res.off('close', onClose);
+          resolve();
+        };
+        const onClose = () => {
+          res.off('drain', onDrain);
+          resolve();
+        };
+        res.once('drain', onDrain);
+        res.once('close', onClose);
+      });
+    }
+  };
+
+  res.flushHeaders();
+  await send({ type: 'progress', message: 'Historic search started' });
+
   try {
     const seenLocIds = new Set<string>();
+    let rateLimited = false;
 
-    const subnationalResults = await Promise.allSettled(
-      subnationalCodes.map(async (subnationalCode) => {
-        const observations = await fetchHistoricSpecies({
+    for (const subnationalCode of subnationalCodes) {
+      if (cancelled || rateLimited) {
+        break;
+      }
+
+      try {
+        const locationResults = await fetchHistoricSpecies({
           subnationalCode,
-          date: rawDate,
-          ...bounds,
+          date,
+          bounds,
+          onBoundedObservations: (observations) =>
+            send({ type: 'observations', observations }),
+          signal: abortController.signal,
         });
-
-        const locIds = Array.from(
-          new Set(
-            getLocIdsFromHistoricResults([
-              {
-                status: 'fulfilled',
-                value: observations,
-              },
-            ])
-          )
-        ).filter((locId) => {
+        const locIds = getLocIds(locationResults).filter((locId) => {
           if (seenLocIds.has(locId)) {
             return false;
           }
-
           seenLocIds.add(locId);
           return true;
         });
 
-        const locResults = locIds.length
-          ? await Promise.allSettled(
-              locIds.map((locId) =>
-                fetchHistoricSpecies({
-                  locId,
-                  date: rawDate,
-                  ...bounds,
-                })
-              )
-            )
-          : [];
+        await send({
+          type: 'progress',
+          message: `Found ${locIds.length} locations for ${subnationalCode}`,
+        });
 
-        return [
-          ...observations,
-          ...locResults.flatMap((result) =>
-            result.status === 'fulfilled'
-              ? Array.isArray(result.value)
-                ? result.value
-                : []
-              : []
-          ),
-        ];
-      })
-    );
-
-    const successfulResults = subnationalResults.flatMap((result) =>
-      result.status === 'fulfilled'
-        ? Array.isArray(result.value)
-          ? result.value
-          : []
-        : []
-    );
-
-    return res.status(200).json(successfulResults);
+        for (const locId of locIds) {
+          if (cancelled || rateLimited) {
+            break;
+          }
+          try {
+            await send({
+              type: 'progress',
+              message: `Fetching observations for ${locId}`,
+            });
+            const observations = await fetchHistoricSpecies({
+              locId,
+              date,
+              signal: abortController.signal,
+            });
+            const observationsInBounds = filterObservationsByBounds(
+              observations,
+              bounds
+            );
+            await send({
+              type: 'progress',
+              message: `${locId}: ${observationsInBounds.length} of ${observations.length} observations within map bounds`,
+            });
+            if (observationsInBounds.length) {
+              await send({
+                type: 'observations',
+                observations: observationsInBounds,
+              });
+            }
+          } catch (error) {
+            if (cancelled) {
+              break;
+            }
+            console.error(
+              `Failed to fetch historic observations for ${locId}:`,
+              error
+            );
+            await send({ type: 'error', message: errorMessage(error) });
+            rateLimited =
+              error instanceof EbirdApiError && error.status === 429;
+          }
+        }
+      } catch (error) {
+        if (cancelled) {
+          break;
+        }
+        console.error(
+          `Failed to fetch historic location IDs for ${subnationalCode}:`,
+          error
+        );
+        await send({ type: 'error', message: errorMessage(error) });
+        rateLimited =
+          error instanceof EbirdApiError && error.status === 429;
+      }
+    }
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Historic streaming response failed:', error);
+    await send({ type: 'error', message: errorMessage(error) });
+  } finally {
+    if (!cancelled && !res.writableEnded) {
+      res.end();
+    }
   }
 }

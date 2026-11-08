@@ -14,6 +14,77 @@ export type HistoricBirdCard = {
   group: string;
 };
 
+type HistoricStreamMessage =
+  | { type: 'observations'; observations: unknown[] }
+  | { type: 'error'; message: string }
+  | { type: 'progress'; message: string };
+
+const consumeHistoricStream = async (
+  response: Response,
+  onObservations: (observations: unknown[]) => void
+) => {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Historic search response has no readable body');
+  }
+
+  const decoder = new TextDecoder();
+  const streamErrors: string[] = [];
+  let buffer = '';
+
+  const processLine = (line: string) => {
+    if (!line.trim()) {
+      return;
+    }
+
+    const parsed: unknown = JSON.parse(line);
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('Invalid historic search stream message');
+    }
+
+    const message = parsed as HistoricStreamMessage;
+    if (
+      message.type === 'observations' &&
+      Array.isArray(message.observations)
+    ) {
+      onObservations(message.observations);
+      return;
+    }
+    if (message.type === 'error' && typeof message.message === 'string') {
+      streamErrors.push(message.message);
+      return;
+    }
+    if (message.type === 'progress' && typeof message.message === 'string') {
+      return;
+    }
+
+    throw new Error('Invalid historic search stream message');
+  };
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      lines.forEach(processLine);
+
+      if (done) {
+        break;
+      }
+    }
+
+    processLine(buffer);
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (streamErrors.length) {
+    throw new Error(streamErrors.join('; '));
+  }
+};
+
 type UseBirdHistoricProps = {
   hotspotSubnationalCodes: string[];
   mapBounds: {
@@ -62,53 +133,6 @@ export const useBirdHistoric = ({
   const taxonomyRequestRef = useRef(new Set<string>());
   const handledEmptyDatesRef = useRef(new Set<string>());
   const activeHistoricFetchesRef = useRef(0);
-  const historicWarmUpRequestedRef = useRef(false);
-
-  useEffect(() => {
-    if (
-      !hotspotSubnationalCodes.length ||
-      historicWarmUpRequestedRef.current
-    ) {
-      return;
-    }
-
-    historicWarmUpRequestedRef.current = true;
-
-    const params = new URLSearchParams({
-      date: new Date().toISOString().slice(0, 10),
-      north: String(mapBounds.north),
-      south: String(mapBounds.south),
-      east: String(mapBounds.east),
-      west: String(mapBounds.west),
-    });
-    params.append('subnationalCode', hotspotSubnationalCodes[0]);
-
-    const warmUpHistoricSearch = async () => {
-      try {
-        const response = await fetch(
-          `/api/ebirdHistoricSpeciesSearch?${params.toString()}`
-        );
-
-        if (!response.ok) {
-          console.error(
-            'Historic search warm-up failed:',
-            response.status,
-            response.statusText
-          );
-        }
-      } catch (error) {
-        console.error('Unexpected historic search warm-up error:', error);
-      }
-    };
-
-    void warmUpHistoricSearch();
-  }, [
-    hotspotSubnationalCodes,
-    mapBounds.north,
-    mapBounds.south,
-    mapBounds.east,
-    mapBounds.west,
-  ]);
 
   const addDate = useCallback(
     (nextDate: string) => {
@@ -211,6 +235,7 @@ export const useBirdHistoric = ({
     }
 
     let cancelled = false;
+    const abortControllers = new Set<AbortController>();
 
     const datesToFetch = selectedDates.filter(
       (date) => !requestedDatesRef.current.has(date)
@@ -228,8 +253,13 @@ export const useBirdHistoric = ({
 
     const loadHistoricBirds = async () => {
       try {
-        const results = await Promise.allSettled(
-          datesToFetch.map(async (date) => {
+        for (const date of datesToFetch) {
+          if (cancelled) {
+            break;
+          }
+
+            const abortController = new AbortController();
+            abortControllers.add(abortController);
             const params = new URLSearchParams({
               date,
               north: String(mapBounds.north),
@@ -242,69 +272,93 @@ export const useBirdHistoric = ({
               params.append('subnationalCode', subnationalCode);
             });
 
-            const response = await fetch(
-              `/api/ebirdHistoricSpeciesSearch?${params.toString()}`
-            );
-
-            if (!response.ok) {
-              throw new Error(
-                `Historic fetch failed for ${hotspotSubnationalCodes.join(', ')} on ${date}`
+            try {
+              const response = await fetch(
+                `/api/ebirdHistoricSpeciesSearch?${params.toString()}`,
+                { signal: abortController.signal }
               );
-            }
 
-            const observations = await response.json();
-            const birdsForDate = (Array.isArray(observations) ? observations : [])
-              .map((observation: any) => ({
-                name:
-                  observation?.comName ||
-                  observation?.sciName ||
-                  observation?.speciesCode ||
-                  '',
-                speciesCode: observation?.speciesCode || '',
-              }))
-              .filter((bird) => bird.name || bird.speciesCode);
-
-            const dedupedBirds = new Map<string, HistoricBird>();
-
-            birdsForDate.forEach((bird) => {
-              const key = bird.speciesCode || bird.name.toLowerCase();
-
-              if (!dedupedBirds.has(key)) {
-                dedupedBirds.set(key, bird);
+              if (!response.ok) {
+                throw new Error(
+                  `Historic fetch failed for ${hotspotSubnationalCodes.join(', ')} on ${date}: ${response.status} ${response.statusText}`
+                );
               }
-            });
 
-            const birdsForSelectedDate = Array.from(dedupedBirds.values());
+              const dedupedBirds = new Map<string, HistoricBird>();
 
-            if (!cancelled) {
-              setHistoricBirdsByDate((previous) => ({
-                ...previous,
-                [date]: birdsForSelectedDate,
-              }));
+              await consumeHistoricStream(response, (observations) => {
+                const newBirds: HistoricBird[] = [];
+                observations.forEach((value) => {
+                  if (!value || typeof value !== 'object') {
+                    return;
+                  }
+                  const observation = value as Record<string, unknown>;
+                  const bird = {
+                    name: String(
+                      observation.comName ||
+                        observation.sciName ||
+                        observation.speciesCode ||
+                        ''
+                    ),
+                    speciesCode: String(observation.speciesCode || ''),
+                  };
+                  if (!bird.name && !bird.speciesCode) {
+                    return;
+                  }
+
+                  const key =
+                    bird.speciesCode || bird.name.trim().toLowerCase();
+                  if (!dedupedBirds.has(key)) {
+                    dedupedBirds.set(key, bird);
+                    newBirds.push(bird);
+                  }
+                });
+
+                if (!cancelled && newBirds.length) {
+                  setHistoricBirdsByDate((previous) => {
+                    const birdsByKey = new Map(
+                      (previous[date] ?? []).map((bird) => [
+                        bird.speciesCode ||
+                          bird.name.trim().toLowerCase(),
+                        bird,
+                      ])
+                    );
+                    newBirds.forEach((bird) => {
+                      birdsByKey.set(
+                        bird.speciesCode ||
+                          bird.name.trim().toLowerCase(),
+                        bird
+                      );
+                    });
+                    return {
+                      ...previous,
+                      [date]: Array.from(birdsByKey.values()),
+                    };
+                  });
+                }
+              });
 
               if (
-                birdsForSelectedDate.length === 0 &&
+                !cancelled &&
+                dedupedBirds.size === 0 &&
                 !handledEmptyDatesRef.current.has(date)
               ) {
                 handledEmptyDatesRef.current.add(date);
                 setShowNoObservationsMessage(true);
                 setEmptyNoticeVersion((version) => version + 1);
               }
+            } catch (error) {
+              if (!cancelled) {
+                console.error(
+                  `Failed to stream historical birds for ${date}:`,
+                  error
+                );
+                requestedDatesRef.current.delete(date);
+              }
+            } finally {
+              abortControllers.delete(abortController);
             }
-
-            return date;
-          })
-        );
-
-        if (cancelled) {
-          return;
         }
-
-        results.forEach((result, index) => {
-          if (result.status === 'rejected') {
-            requestedDatesRef.current.delete(datesToFetch[index]);
-          }
-        });
       } catch (error) {
         console.error('Failed to load historical birds:', error);
       } finally {
@@ -323,6 +377,7 @@ export const useBirdHistoric = ({
 
     return () => {
       cancelled = true;
+      abortControllers.forEach((abortController) => abortController.abort());
     };
   }, [
     selectedDates,
