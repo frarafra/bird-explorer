@@ -54,12 +54,61 @@ export const useBirdHistoric = ({
   const [historicBirdsByDate, setHistoricBirdsByDate] = useState<
     Record<string, HistoricBird[]>
   >({});
+  const [isLoadingHistoric, setIsLoadingHistoric] = useState(false);
   const [showNoObservationsMessage, setShowNoObservationsMessage] = useState(false);
   const [emptyNoticeVersion, setEmptyNoticeVersion] = useState(0);
 
   const requestedDatesRef = useRef(new Set<string>());
   const taxonomyRequestRef = useRef(new Set<string>());
   const handledEmptyDatesRef = useRef(new Set<string>());
+  const activeHistoricFetchesRef = useRef(0);
+  const historicWarmUpRequestedRef = useRef(false);
+
+  useEffect(() => {
+    if (
+      !hotspotSubnationalCodes.length ||
+      historicWarmUpRequestedRef.current
+    ) {
+      return;
+    }
+
+    historicWarmUpRequestedRef.current = true;
+
+    const params = new URLSearchParams({
+      date: new Date().toISOString().slice(0, 10),
+      north: String(mapBounds.north),
+      south: String(mapBounds.south),
+      east: String(mapBounds.east),
+      west: String(mapBounds.west),
+    });
+    params.append('subnationalCode', hotspotSubnationalCodes[0]);
+
+    const warmUpHistoricSearch = async () => {
+      try {
+        const response = await fetch(
+          `/api/ebirdHistoricSpeciesSearch?${params.toString()}`
+        );
+
+        if (!response.ok) {
+          console.error(
+            'Historic search warm-up failed:',
+            response.status,
+            response.statusText
+          );
+        }
+      } catch (error) {
+        console.error('Unexpected historic search warm-up error:', error);
+      }
+    };
+
+    void warmUpHistoricSearch();
+  }, [
+    hotspotSubnationalCodes,
+    mapBounds.north,
+    mapBounds.south,
+    mapBounds.east,
+    mapBounds.west,
+  ]);
 
   const addDate = useCallback(
     (nextDate: string) => {
@@ -174,6 +223,8 @@ export const useBirdHistoric = ({
     datesToFetch.forEach((date) => {
       requestedDatesRef.current.add(date);
     });
+    activeHistoricFetchesRef.current += 1;
+    setIsLoadingHistoric(true);
 
     const loadHistoricBirds = async () => {
       try {
@@ -262,6 +313,9 @@ export const useBirdHistoric = ({
             requestedDatesRef.current.delete(date);
           });
         }
+
+        activeHistoricFetchesRef.current -= 1;
+        setIsLoadingHistoric(activeHistoricFetchesRef.current > 0);
       }
     };
 
@@ -508,6 +562,7 @@ export const useBirdHistoric = ({
     historicVisibleBirds,
     paginatedHistoricBirdsToDisplay,
     historicBirdsForImages,
+    isLoadingHistoric,
     showNoObservationsMessage,
     effectiveTaxonomies,
   };

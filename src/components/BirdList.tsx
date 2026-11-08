@@ -137,6 +137,7 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         historicBirdsFlat,
         paginatedHistoricBirdsToDisplay,
         historicBirdsForImages,
+        isLoadingHistoric,
         showNoObservationsMessage,
     } = useBirdHistoric({
         hotspotSubnationalCodes,
@@ -268,6 +269,20 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                 <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
                     no observations for the selected date
                 </p>
+            )}
+
+            {isLoadingHistoric && (
+                <div
+                    className="mb-4 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <span
+                        className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-sky-600 dark:border-slate-600 dark:border-t-sky-300"
+                        aria-hidden="true"
+                    />
+                    Loading historical observations…
+                </div>
             )}
 
             {selectedDates.length > 0 ? (
