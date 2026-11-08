@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { getRedisClient } from '../../client/redis';
 
 const EBIRD_HISTORIC_API_URL = 'https://api.ebird.org/v2/data/obs';
+const HISTORIC_SUBNATIONAL_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 type HistoricBounds = {
   north?: number;
@@ -99,6 +101,23 @@ async function fetchHistoricSpecies({
     ? `${EBIRD_HISTORIC_API_URL}/${locId}/historic/${normalizedDate}`
     : `${EBIRD_HISTORIC_API_URL}/${subnationalCode}/historic/${normalizedDate}`;
 
+  const redis = subnationalCode ? getRedisClient() : null;
+  const cacheKey = subnationalCode
+    ? `ebirdHistoricSubnationalLocIds:${encodeURIComponent(subnationalCode)}:${normalizedDate}`
+    : null;
+  const cachedData = cacheKey && redis ? await redis.get(cacheKey) : null;
+
+  if (cachedData) {
+    const observations: unknown = JSON.parse(cachedData);
+    if (!Array.isArray(observations)) {
+      throw new Error(
+        `Invalid cached historic location IDs for ${subnationalCode}`
+      );
+    }
+
+    return observations;
+  }
+
   const response = await fetch(endpoint, {
     headers: {
       'X-eBirdApiToken': process.env.NEXT_PUBLIC_EBIRD_API_TOKEN || '',
@@ -112,11 +131,31 @@ async function fetchHistoricSpecies({
   const data = await response.json();
   const observations = Array.isArray(data) ? data : [];
 
-  if (!subnationalCode) {
-    return observations;
+  if (subnationalCode) {
+    const locationIds = Array.from(
+      new Set(
+        observations
+          .map((observation: any) => observation?.locId)
+          .filter(
+            (locId: unknown): locId is string =>
+              typeof locId === 'string' && locId.trim().length > 0
+          )
+      )
+    ).map((locId) => ({ locId }));
+
+    if (cacheKey && redis) {
+      await redis.set(
+        cacheKey,
+        JSON.stringify(locationIds),
+        'EX',
+        HISTORIC_SUBNATIONAL_CACHE_TTL_SECONDS
+      );
+    }
+
+    return locationIds;
   }
 
-  return filterObservationsByBounds(observations, north, south, east, west);
+  return observations;
 }
 
 const getSubnationalCodes = (req: NextApiRequest) => {
