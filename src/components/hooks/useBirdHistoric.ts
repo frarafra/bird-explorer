@@ -14,6 +14,20 @@ export type HistoricBirdCard = {
   group: string;
 };
 
+const getLastWord = (value: string) =>
+  value.trim().split(/\s+/).filter(Boolean).slice(-1)[0]?.toLowerCase() || '';
+
+const getFirstWord = (value: string) =>
+  value.trim().split(/\s+/).filter(Boolean)[0] || '';
+
+const compareHistoricBirdsByName = (
+  first: HistoricBirdCard,
+  second: HistoricBirdCard
+) =>
+  getLastWord(first.name).localeCompare(getLastWord(second.name)) ||
+  getFirstWord(first.name).localeCompare(getFirstWord(second.name)) ||
+  first.name.localeCompare(second.name);
+
 type HistoricStreamMessage =
   | { type: 'observations'; observations: unknown[] }
   | { type: 'error'; message: string }
@@ -133,6 +147,18 @@ export const useBirdHistoric = ({
   const taxonomyRequestRef = useRef(new Set<string>());
   const handledEmptyDatesRef = useRef(new Set<string>());
   const activeHistoricFetchesRef = useRef(0);
+  const selectedDatesRef = useRef(selectedDates);
+  selectedDatesRef.current = selectedDates;
+  const requestContext = JSON.stringify([
+    hotspotSubnationalCodes,
+    mapBounds.north,
+    mapBounds.south,
+    mapBounds.east,
+    mapBounds.west,
+  ]);
+  const requestContextRef = useRef(requestContext);
+  requestContextRef.current = requestContext;
+  const isMountedRef = useRef(true);
 
   const addDate = useCallback(
     (nextDate: string) => {
@@ -159,6 +185,13 @@ export const useBirdHistoric = ({
     },
     [setPage]
   );
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!showNoObservationsMessage) {
@@ -235,7 +268,7 @@ export const useBirdHistoric = ({
     }
 
     let cancelled = false;
-    const abortControllers = new Set<AbortController>();
+    const abortControllers = new Map<string, AbortController>();
 
     const datesToFetch = selectedDates.filter(
       (date) => !requestedDatesRef.current.has(date)
@@ -258,8 +291,13 @@ export const useBirdHistoric = ({
             break;
           }
 
+          if (!selectedDatesRef.current.includes(date)) {
+            requestedDatesRef.current.delete(date);
+            continue;
+          }
+
             const abortController = new AbortController();
-            abortControllers.add(abortController);
+            abortControllers.set(date, abortController);
             const params = new URLSearchParams({
               date,
               north: String(mapBounds.north),
@@ -348,7 +386,9 @@ export const useBirdHistoric = ({
                 setEmptyNoticeVersion((version) => version + 1);
               }
             } catch (error) {
-              if (!cancelled) {
+              if (abortController.signal.aborted) {
+                requestedDatesRef.current.delete(date);
+              } else if (!cancelled) {
                 console.error(
                   `Failed to stream historical birds for ${date}:`,
                   error
@@ -356,7 +396,7 @@ export const useBirdHistoric = ({
                 requestedDatesRef.current.delete(date);
               }
             } finally {
-              abortControllers.delete(abortController);
+              abortControllers.delete(date);
             }
         }
       } catch (error) {
@@ -376,8 +416,22 @@ export const useBirdHistoric = ({
     void loadHistoricBirds();
 
     return () => {
-      cancelled = true;
-      abortControllers.forEach((abortController) => abortController.abort());
+      if (
+        !isMountedRef.current ||
+        requestContextRef.current !== requestContext
+      ) {
+        cancelled = true;
+        abortControllers.forEach((abortController) =>
+          abortController.abort()
+        );
+        return;
+      }
+
+      abortControllers.forEach((abortController, date) => {
+        if (!selectedDatesRef.current.includes(date)) {
+          abortController.abort();
+        }
+      });
     };
   }, [
     selectedDates,
@@ -523,7 +577,7 @@ export const useBirdHistoric = ({
       (acc, groupName) => {
         acc[groupName] = historicBirdCards.filter(
           (bird) => bird.group === groupName
-        );
+        ).sort(compareHistoricBirdsByName);
 
         return acc;
       },
