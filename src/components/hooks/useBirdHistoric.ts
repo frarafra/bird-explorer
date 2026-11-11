@@ -607,8 +607,11 @@ export const useBirdHistoric = ({
   );
 
   const historicVisibleBirds = useMemo(
-    () => historicBirdsFlat.slice(0, (page + 1) * batchSize),
-    [batchSize, historicBirdsFlat, page]
+    () =>
+      selectedGroup === 'All Groups'
+        ? historicBirdsFlat.slice(0, (page + 1) * batchSize)
+        : historicBirdsFlat,
+    [batchSize, historicBirdsFlat, page, selectedGroup]
   );
 
   const paginatedHistoricBirdsToDisplay = useMemo(

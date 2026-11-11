@@ -275,7 +275,8 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
                         </div>
                     ))}
 
-                    {historicBirdsFlat.length > (page + 1) * batchSize && (
+                    {selectedGroup === 'All Groups' &&
+                        historicBirdsFlat.length > (page + 1) * batchSize && (
                         <div className="mt-3 text-center">
                             <button
                                 onClick={() => setPage(prevPage => prevPage + 1)}
