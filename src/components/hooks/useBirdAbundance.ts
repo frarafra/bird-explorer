@@ -1,15 +1,46 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 type BirdEntry = [string, string];
 
 type AbundanceResponse = {
-    birds?: Array<{
+    birds: Array<{
         speciesCode: string;
         total: number;
         rate: number;
     }>;
 };
+
+type StreamMessage =
+    | { type: 'bird'; bird: AbundanceResponse['birds'][number] }
+    | { type: 'complete' }
+    | { type: 'error'; message: string };
+
+function isStreamMessage(value: unknown): value is StreamMessage {
+    if (!value || typeof value !== 'object' || !('type' in value)) {
+        return false;
+    }
+
+    if (value.type === 'bird') {
+        return (
+            'bird' in value &&
+            typeof value.bird === 'object' &&
+            value.bird !== null &&
+            'speciesCode' in value.bird &&
+            typeof value.bird.speciesCode === 'string' &&
+            'total' in value.bird &&
+            typeof value.bird.total === 'number' &&
+            'rate' in value.bird &&
+            typeof value.bird.rate === 'number'
+        );
+    }
+
+    if (value.type === 'complete') {
+        return true;
+    }
+
+    return value.type === 'error' && 'message' in value && typeof value.message === 'string';
+}
 
 type UseBirdAbundanceProps = {
     filteredBirds: BirdEntry[];
@@ -26,6 +57,7 @@ export function useBirdAbundance({
     lat,
     lng,
 }: UseBirdAbundanceProps) {
+    const queryClient = useQueryClient();
     const speciesCodes = useMemo(() => {
         const activeBirds =
             selectedGroup === 'All Groups'
@@ -37,14 +69,16 @@ export function useBirdAbundance({
             .filter(Boolean);
     }, [filteredBirds, paginatedBirds, selectedGroup]);
 
+    const queryKey = [
+        'birdAbundance',
+        selectedGroup,
+        speciesCodes,
+        lat,
+        lng,
+    ];
+
     const { data, isLoading, error } = useQuery({
-        queryKey: [
-            'birdAbundance',
-            selectedGroup,
-            speciesCodes,
-            lat,
-            lng,
-        ],
+        queryKey,
         queryFn: async (): Promise<AbundanceResponse> => {
             const params = new URLSearchParams({
                 species: speciesCodes.join(','),
@@ -60,7 +94,77 @@ export function useBirdAbundance({
                 throw new Error('Failed to fetch abundance data');
             }
 
-            return response.json();
+            if (!response.body) {
+                throw new Error('Abundance response does not support streaming');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            const birds: AbundanceResponse['birds'] = [];
+            let buffer = '';
+            let completed: AbundanceResponse | undefined;
+
+            const processLine = (line: string) => {
+                if (!line.trim()) {
+                    return;
+                }
+                if (completed) {
+                    throw new Error('Abundance stream sent data after completion');
+                }
+
+                const parsed: unknown = JSON.parse(line);
+                if (!isStreamMessage(parsed)) {
+                    throw new Error('Invalid abundance stream message');
+                }
+
+                if (parsed.type === 'error') {
+                    throw new Error(parsed.message);
+                }
+
+                if (parsed.type === 'bird') {
+                    birds.push(parsed.bird);
+                    queryClient.setQueryData<AbundanceResponse>(queryKey, {
+                        birds: [...birds],
+                    });
+                    return;
+                }
+                completed = {
+                    birds: [...birds],
+                };
+                queryClient.setQueryData<AbundanceResponse>(queryKey, completed);
+            };
+
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    buffer += decoder.decode(value, { stream: !done });
+
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() ?? '';
+                    lines.forEach(processLine);
+
+                    if (done) {
+                        break;
+                    }
+                }
+
+                processLine(buffer);
+            } catch (error) {
+                try {
+                    await reader.cancel();
+                } catch (cancelError) {
+                    console.error('Failed to cancel abundance response stream:', cancelError);
+                }
+                throw error;
+            } finally {
+                reader.releaseLock();
+            }
+
+            if (!completed) {
+                throw new Error('Abundance stream ended before completion');
+            }
+
+            return completed;
         },
         enabled:
             selectedGroup !== 'All Groups' &&
@@ -69,7 +173,7 @@ export function useBirdAbundance({
     });
 
     const abundanceBySpeciesCode = useMemo(() => {
-        return (data?.birds ?? []).reduce<
+        return data?.birds.reduce<
             Record<string, { total: number; rate: number }>
         >((acc, bird) => {
             acc[bird.speciesCode] = {
@@ -78,7 +182,7 @@ export function useBirdAbundance({
             };
 
             return acc;
-        }, {});
+        }, {}) ?? {};
     }, [data]);
 
     const abundanceSortedBirds = useMemo(() => {
