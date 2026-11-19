@@ -87,13 +87,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const lat = Number(req.query.lat ?? process.env.NEXT_PUBLIC_LAT ?? 0);
   const lng = Number(req.query.lng ?? process.env.NEXT_PUBLIC_LNG ?? 0);
-  const cacheKey = `ebirdHowMany:${Array.isArray(speciesParam) ? speciesParam.join(',') : String(speciesParam)}:${lat}:${lng}`;
+  const cacheKeys = speciesCodes.map(
+    (speciesCode) => `ebirdHowMany:${encodeURIComponent(speciesCode)}:${lat}:${lng}`,
+  );
   const redis = getRedisClient();
 
-  let cachedPayload: { birds: BirdResult[] } | null;
+  let cachedBirds: Array<BirdResult | null>;
   try {
-    const cachedData = await redis.get(cacheKey);
-    cachedPayload = cachedData ? JSON.parse(cachedData) : null;
+    const cachedData = await redis.mget(cacheKeys);
+    cachedBirds = cachedData.map((cachedBird) =>
+      cachedBird ? JSON.parse(cachedBird) : null,
+    );
   } catch (error) {
     console.error('Failed to read eBird abundance cache:', error);
     return res.status(500).json({ error: 'Internal Server Error' });
@@ -136,23 +140,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.flushHeaders();
 
   try {
-    const birds: BirdResult[] = [];
-
-    if (cachedPayload) {
-      for (const bird of cachedPayload.birds) {
-        if (cancelled) {
-          break;
-        }
-        birds.push(bird);
-        await send({ type: 'bird', bird });
+    for (const [index, speciesCode] of speciesCodes.entries()) {
+      if (cancelled) {
+        break;
       }
-    } else {
-      for (const speciesCode of speciesCodes) {
-        if (cancelled) {
-          break;
-        }
 
-        let bird: BirdResult;
+      let bird = cachedBirds[index];
+      if (!bird) {
         try {
           const observations = await searchObservations({ bird: speciesCode, lat, lng });
           const total = getTotal(observations);
@@ -170,19 +164,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           };
         }
 
-        birds.push(bird);
-        await send({ type: 'bird', bird });
-      }
-
-      if (!cancelled) {
-        const payload = { birds };
         try {
-          await redis.set(cacheKey, JSON.stringify(payload), 'EX', 600);
+          await redis.set(cacheKeys[index], JSON.stringify(bird), 'EX', 600);
         } catch (error) {
-          console.error('Failed to cache eBird abundance results:', error);
+          console.error('Failed to cache eBird abundance result:', error);
           throw error;
         }
       }
+
+      await send({ type: 'bird', bird });
     }
 
     if (!cancelled) {
