@@ -5,7 +5,7 @@ import {
     useEffect,
     useState
 } from 'react';
-import { Result, MapCenter } from '../types';
+import { Hotspot, Result, MapCenter } from '../types';
 
 export type Recording = {
     q?: string;
@@ -66,6 +66,9 @@ interface BirdContextType {
 
     hotspotSubnationalCodes: string[];
     setHotspotSubnationalCodes: React.Dispatch<React.SetStateAction<string[]>>;
+
+    hotspots: Hotspot[];
+    setHotspots: React.Dispatch<React.SetStateAction<Hotspot[]>>;
 }
 
 export const BirdContext = createContext<BirdContextType>({
@@ -125,7 +128,10 @@ export const BirdContext = createContext<BirdContextType>({
     setSelectedSpecies: () => {},
 
     hotspotSubnationalCodes: [],
-    setHotspotSubnationalCodes: () => {}
+    setHotspotSubnationalCodes: () => {},
+
+    hotspots: [],
+    setHotspots: () => {}
 });
 
 interface BirdProviderProps {
@@ -165,6 +171,8 @@ export const BirdProvider: FC<BirdProviderProps> = ({
 
     const [hotspotSubnationalCodes, setHotspotSubnationalCodes] =
         useState<string[]>([]);
+
+    const [hotspots, setHotspots] = useState<Hotspot[]>([]);
 
     const [mapCenter, setMapCenter] = useState<MapCenter>({
         lat: parseFloat(
@@ -271,7 +279,10 @@ export const BirdProvider: FC<BirdProviderProps> = ({
                 setSelectedSpecies,
 
                 hotspotSubnationalCodes,
-                setHotspotSubnationalCodes
+                setHotspotSubnationalCodes,
+
+                hotspots,
+                setHotspots
             }}
         >
             {children}

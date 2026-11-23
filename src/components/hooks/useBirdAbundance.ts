@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Hotspot } from '../../types';
 
 type BirdEntry = [string, string];
 
@@ -42,10 +43,30 @@ function isStreamMessage(value: unknown): value is StreamMessage {
     return value.type === 'error' && 'message' in value && typeof value.message === 'string';
 }
 
+function waitForFetchDelay(signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            signal.removeEventListener('abort', onAbort);
+            resolve();
+        }, Number(process.env.ABUNDANCE_FETCH_DELAY_MS));
+        const onAbort = () => {
+            clearTimeout(timeout);
+            reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+        };
+
+        if (signal.aborted) {
+            onAbort();
+        } else {
+            signal.addEventListener('abort', onAbort, { once: true });
+        }
+    });
+}
+
 type UseBirdAbundanceProps = {
     filteredBirds: BirdEntry[];
     paginatedBirds: BirdEntry[];
     selectedGroup: string;
+    hotspots: Hotspot[];
     lat: number;
     lng: number;
 };
@@ -54,6 +75,7 @@ export function useBirdAbundance({
     filteredBirds,
     paginatedBirds,
     selectedGroup,
+    hotspots,
     lat,
     lng,
 }: UseBirdAbundanceProps) {
@@ -79,7 +101,9 @@ export function useBirdAbundance({
 
     const { data, isLoading, error } = useQuery({
         queryKey,
-        queryFn: async (): Promise<AbundanceResponse> => {
+        queryFn: async ({ signal }): Promise<AbundanceResponse> => {
+            await waitForFetchDelay(signal);
+
             const params = new URLSearchParams({
                 species: speciesCodes.join(','),
                 lat: String(lat),
@@ -87,7 +111,8 @@ export function useBirdAbundance({
             });
 
             const response = await fetch(
-                `/api/ebirdHowMany?${params.toString()}`
+                `/api/ebirdHowMany?${params.toString()}`,
+                { signal }
             );
 
             if (!response.ok) {
@@ -153,7 +178,9 @@ export function useBirdAbundance({
                 try {
                     await reader.cancel();
                 } catch (cancelError) {
-                    console.error('Failed to cancel abundance response stream:', cancelError);
+                    if (!signal.aborted) {
+                        console.error('Failed to cancel abundance response stream:', cancelError);
+                    }
                 }
                 throw error;
             } finally {
@@ -167,7 +194,7 @@ export function useBirdAbundance({
             return completed;
         },
         enabled:
-            selectedGroup !== 'All Groups' &&
+            (selectedGroup !== 'All Groups' || hotspots.length > 0) &&
             speciesCodes.length > 0,
         staleTime: 1000 * 60 * 5,
     });

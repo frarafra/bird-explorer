@@ -7,7 +7,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 
 import ComparisonResults from './ComparisonResults';
 
-import { Hotspot, MapEventsHandlerProps, Result, Observation,
+import { MapEventsHandlerProps, Result, Observation,
 } from '../types';
 
 import { calculateBounds } from '../utils/mapUtils';
@@ -193,7 +193,7 @@ const MapResizeHandler = ({ expanded }: { expanded: boolean }) => {
 };
 
 const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResultId }) => {
-  const { setBirds, setTaxonomies, setMapCenter, setMapBounds, mapDist, setMapDist, mapZoom, setMapZoom, setObservations, speciesObserved, taxonomiesReady, mapExpanded, setMapExpanded, setHotspotSubnationalCodes } = useContext(BirdContext);
+  const { setBirds, setTaxonomies, setMapCenter, setMapBounds, mapDist, setMapDist, mapZoom, setMapZoom, setObservations, speciesObserved, taxonomiesReady, mapExpanded, setMapExpanded, setHotspotSubnationalCodes, hotspots, setHotspots } = useContext(BirdContext);
   const [compareMode, setCompareMode] = useState(false);
   const [point1, setPoint1] = useState<{lat: number, lng: number, species: string[], locationName?: string} | null>(null);
   const [point2, setPoint2] = useState<{lat: number, lng: number, species: string[], locationName?: string} | null>(null);
@@ -204,8 +204,6 @@ const BirdsMap: React.FC<MapProps> = ({ extended, lat, lng, results, hoveredResu
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [locationQuery, setLocationQuery] = useState('');
   const [bounds, setBounds] = useState<[[number, number], [number, number]] | null>(null);
-  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
-
   useEffect(() => {
     const distinctSubnationalCodes = Array.from(
       new Set(
