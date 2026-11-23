@@ -21,14 +21,7 @@ export async function searchObservations({
   );
 
   if (!response.ok) {
-    const headers: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
-    console.error('Failed to fetch data from eBird API:', {
-      status: response.status,
-      headers,
-    });
+    console.error(`Failed to fetch data from eBird API: ${response.headers.values().forEach((value) => console.log(value))}`);
     throw new Error('Failed to fetch data from eBird API');
   }
 
