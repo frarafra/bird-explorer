@@ -27,7 +27,6 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         mapBounds,
         setTaxonomies,
         taxonomies: contextTaxonomies,
-        hotspots,
     } = useContext(BirdContext);
 
 
@@ -100,7 +99,6 @@ const BirdList: FC<BirdListProps> = ({ birds, taxonomies }) => {
         filteredBirds,
         paginatedBirds,
         selectedGroup,
-        hotspots,
         lat,
         lng,
     });
